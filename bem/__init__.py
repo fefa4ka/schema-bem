@@ -5,6 +5,7 @@ import importlib
 from pathlib import Path
 from collections import defaultdict
 
+from settings import BLOCKS_PATH
 from .base import Block
 from .util import u, is_tolerated
 from .builder import Build
@@ -22,7 +23,7 @@ except ImportError:
 builtins.SIMULATION = False
 
 
-def bem_scope(root='./blocks'):
+def bem_scope(root=BLOCKS_PATH):
     blocks = defaultdict(dict)
 
     # Get Blocks from current root scopes
@@ -77,5 +78,19 @@ def bem_scope_module(scopes, root=''):
     if root:
         sys.modules[__name__ + root] = type(root, (object,), blocks)
 
+
 root = bem_scope()
 bem_scope_module(root)
+
+
+# Digital Units
+from PySpice.Unit.Unit import Unit
+from PySpice.Unit import u_Degree, _build_unit_shortcut
+class Byte(Unit):
+    __unit_name__ = 'byte'
+    __unit_suffix__ = 'B'
+    __quantity__ = 'byte'
+    __default_unit__ = False 
+
+_build_unit_shortcut(Byte())
+

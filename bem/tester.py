@@ -7,7 +7,7 @@ import inspect
 from bem import Net
 
 from bem import Block, Build, u_s
-from probe import get_arg_units, get_minimum_period
+from .util import get_arg_units, get_minimum_period
 from settings import BLOCKS_PATH, test_body_kit, test_sources
 
 from .simulator import Simulate, set_spice_enviroment
