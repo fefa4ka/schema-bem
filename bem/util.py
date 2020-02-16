@@ -1,4 +1,5 @@
-from settings import params_tolerance
+from PySpice.Unit import u_s, u_Hz, u_A, u_V
+
 
 _prefix = {
     'y': 1e-24,  # yocto
@@ -42,7 +43,7 @@ def label_prepare(text):
 
     return text
 
-def is_tolerated(a, b, tollerance=params_tolerance):
+def is_tolerated(a, b, tollerance=0.1):
     """
     A mathematical model for symmetrical parameter variations is
     `P_(nom) * (1 − ε) ≤ P ≤ P_(nom)(1 + ε)`

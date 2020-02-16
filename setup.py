@@ -2,8 +2,7 @@ from setuptools import setup
 
 requirements = [
     'skidl',
-    'sympy',
-    'lcapy'
+    'peewee'
 ]
 
 setup(

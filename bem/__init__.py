@@ -5,25 +5,20 @@ import importlib
 from pathlib import Path
 from collections import defaultdict
 
-from settings import BLOCKS_PATH
 from .base import Block
 from .util import u, is_tolerated
 from .builder import Build
 from .stockman import Stockman
 from PySpice.Unit import *
 from skidl import Net, set_default_tool, set_backup_lib, KICAD
+import builtins
+
 set_backup_lib('.')
 set_default_tool(KICAD)
 
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
-
 builtins.SIMULATION = False
 
-
-def bem_scope(root=BLOCKS_PATH):
+def bem_scope(root='./blocks'):
     blocks = defaultdict(dict)
 
     # Get Blocks from current root scopes
@@ -34,7 +29,7 @@ def bem_scope(root=BLOCKS_PATH):
         # Get Blocks from current root
         scope_root = root + '/' + scope
         for file in glob.glob(scope_root + '/*/__init__.py'):
-            tail = file.split('/') 
+            tail = file.split('/')
             element = tail[-2]
             if element[0].isupper() == False:
                 continue
@@ -50,13 +45,15 @@ def bem_scope(root=BLOCKS_PATH):
 
                 blocks[scope][element][mod_type].append(mod_value)
 
+            blocks[scope][element] = dict(blocks[scope][element])
+
         inner_blocks = bem_scope(scope_root)
         blocks[scope] = {
             **blocks[scope],
             **inner_blocks
         }
 
-    return blocks
+    return dict(blocks)
 
 
 def bem_scope_module(scopes, root=''):
@@ -73,7 +70,7 @@ def bem_scope_module(scopes, root=''):
         def build(name=root[1:] + '.' + block, *arg, **kwarg):
             return Build(name, *arg, **kwarg).block
 
-        blocks[block] = build 
+        blocks[block] = build
 
     if root:
         sys.modules[__name__ + root] = type(root, (object,), blocks)
@@ -90,7 +87,7 @@ class Byte(Unit):
     __unit_name__ = 'byte'
     __unit_suffix__ = 'B'
     __quantity__ = 'byte'
-    __default_unit__ = False 
+    __default_unit__ = False
 
 _build_unit_shortcut(Byte())
 

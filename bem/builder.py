@@ -2,7 +2,6 @@ import importlib
 import logging
 from pathlib import Path
 
-from settings import BLOCKS_PATH
 from .base import Block as BaseBlock
 from skidl import TEMPLATE
 from inspect import getmro
@@ -10,6 +9,7 @@ from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
+BLOCKS_PATH = 'blocks'
 
 class Build:
     name = None
@@ -33,9 +33,6 @@ class Build:
         self.base = base_file.exists() and importlib.import_module(BLOCKS_PATH + '.' + self.name).Base
 
         if self.base:
-            if type(self.base.files) == list:
-                self.files = list(self.base.files)
-
             self.files.append(str(base_file))
 
             for mod, value in kwargs.items():
@@ -57,9 +54,13 @@ class Build:
                     for mod_block_dir in set([block_dir]):
                         module_file = Path(BLOCKS_PATH) / mod_block_dir / ('_' + mod) / (value + '.py')
                         if module_file.exists():
-                            self.files.append(str(module_file))
                             Module = importlib.import_module(BLOCKS_PATH + '.' + mod_block_dir.replace('/', '.') + '._' + mod + '.' + value)
                             self.models.append(Module.Modificator)
+
+                            if hasattr(Module.Modificator, 'files'):
+                                self.files += Module.Modificator.files
+                                self.files.append(str(module_file))
+                                print(mod, value, Module.Modificator.files)
 
                             mods = Module.Modificator.mods if hasattr(Module.Modificator, 'mods') else None
                             if mods:
@@ -78,6 +79,8 @@ class Build:
 
         self.files = sorted(set(self.files), key=self.files.index)
         self.files.reverse()
+        if type(self.base.files) == list:
+            self.files += list(self.base.files)
 
 
     # Run once
@@ -92,7 +95,12 @@ class Build:
             ParentBlock = parent(**mods)
             parent_models = getmro(ParentBlock)[1:-1]
             self.inherited += parent_models
+
+            parent_files = ParentBlock.files.copy()
+            self.files += parent_files
+
             self.ancestors(ParentBlock)
+
 
         return list(OrderedDict.fromkeys(self.inherited))
 
@@ -115,9 +123,19 @@ class Build:
 
     @property
     def block(self):
+        def uniq_f7(seq):
+            seen = set()
+            seen_add = seen.add
+            return [x for x in seq if not (x in seen or seen_add(x))]
+
         Models = self.blocks()
         self.inherited = []
 
+        self.files.reverse()
+        self.files = uniq_f7(self.files)
+        self.files.reverse()
+
+        print('BUILD:', self.name, Models, self.files)
         Block = type(self.name,
                     tuple(Models),
                     {

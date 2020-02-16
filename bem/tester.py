@@ -8,14 +8,58 @@ from bem import Net
 
 from bem import Block, Build, u_s
 from .util import get_arg_units, get_minimum_period
-from settings import BLOCKS_PATH, test_body_kit, test_sources
 
 from .simulator import Simulate, set_spice_enviroment
 
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
+import builtins
+
+BLOCKS_PATH = 'blocks'
+
+test_body_kit = [{
+    'name': 'basic.RLC',
+    'mods': {
+        'series': ['R']
+    },
+    'args': {
+        'R_series': {
+            'value': 1000,
+            'unit': {
+                'name': 'ohm',
+                'suffix': 'Ω'
+            }
+        }
+    },
+    'pins': {
+        'input': ['output'],
+        'output': ['gnd']
+    }
+}, {
+    'name': 'basic.source.VS',
+    'mods': {
+        'flow': ['SINEV']
+    },
+    'args': {
+        'V': {
+            'value': 12,
+            'unit': {
+                'name': 'volt',
+                'suffix': 'V'
+            }
+        },
+        'frequency': {
+            'value': 60,
+            'unit': {
+                'name': 'herz',
+                'suffix': 'Hz'
+            }
+        }
+    },
+    'pins': {
+        'input': ['input'],
+        'output': ['gnd']
+    }
+}]
+
 
 class Test:
     builder = None
@@ -40,78 +84,6 @@ class Test:
         description = getattr(self, method).__doc__.strip()
 
         return description
-
-    # Signal source configuration
-
-    # def sources(self):
-    #     # sources = test_sources
-    #     sources = self._sources if hasattr(self, '_sources') and self._sources else test_sources
-
-    #     gnd = ['gnd']
-    #     if len(self.body_kit()) == 0:
-    #         gnd.append('output')
-
-    #     sources[0]['pins']['n'] = gnd
-
-    #     return sources
-
-    # def sources_circuit(self):
-    #     sources =  self.sources()
-    #     series_sources = defaultdict(list)
-    #     series_sources_allready = []
-
-    #     periods = []  # frequency, time, delay, duration
-        
-    #     # Get Series Source with same input
-    #     for source in sources:
-    #         pins = source['pins'].keys()
-    #         hash_name = str(source['pins']['p']) + str(source['pins']['n'])
-        
-    #         for source_another_index, source_another in enumerate(sources):
-    #             is_same_connection = True
-    #             for source_pin in pins:
-    #                 for index, pin in enumerate(source['pins'][source_pin]):
-    #                     if source_another['pins'][source_pin][index] != pin:
-    #                         is_same_connection = False
-    #                         break
-                
-    #             if is_same_connection and source_another_index not in series_sources_allready:
-    #                 series_sources_allready.append(source_another_index)
-    #                 series_sources[hash_name].append(source_another)
-
-        
-    #     for series in series_sources.keys():
-    #         last_source = None
-
-    #         for source in series_sources[series]:
-    #             part_name = source['name'].split('_')[0]
-    #             # part = get_part(part_name)
-    #             part = Build(part_name).spice
-    #             args = {}
-    #             for arg in source['args'].keys():
-    #                 if source['args'][arg]['value']:
-    #                     try: 
-    #                         args[arg] = float(source['args'][arg]['value']) @ get_arg_units(part, arg)
-    #                     except:
-    #                         try:
-    #                             args[arg] = float(source['args'][arg]['value'])
-    #                             if args[arg] == int(source['args'][arg]['value']):
-    #                                 args[arg] = int(args[arg])
-    #                         except:
-    #                             args[arg] = source['args'][arg]['value'] 
-
-    #             signal = Build(part_name).spice(ref='V' + source['name'], **args)
-
-    #             if not last_source:
-    #                 for pin in source['pins']['n']:
-    #                     signal['n'] += getattr(self.block, pin)
-    #             else:
-    #                 last_source['p'] += signal['n']
-
-    #             last_source = signal
-            
-    #         for pin in source['pins']['p']:
-    #             signal['p'] += getattr(self.block, pin)
 
     # Load configuration
     def body_kit(self):
@@ -163,6 +135,7 @@ class Test:
             'erc': simulation.ERC
         }
 
+
 def BuildTest(Block, *args, **kwargs):
         name = Block.name
         mods = {}
@@ -171,7 +144,7 @@ def BuildTest(Block, *args, **kwargs):
         block_dir = name.replace('.', '/')
 
         base_file = Path(BLOCKS_PATH) / block_dir / ('__init__.py')
-        base = base_file.exists() and importlib.import_module(BLOCKS_PATH + '.' + name).Base        
+        base = base_file.exists() and importlib.import_module(BLOCKS_PATH + '.' + name).Base
 
         base_test = Path(BLOCKS_PATH) / block_dir / ('test.py')
         BaseTest = base_test.exists() and importlib.import_module(BLOCKS_PATH + '.' + name + '.test')
@@ -204,7 +177,7 @@ def BuildTest(Block, *args, **kwargs):
                     test_file = Path(BLOCKS_PATH) / block_dir / ('_' + mod) / (value + '_test.py')
                     if test_file.exists():
                         ModTest = importlib.import_module(BLOCKS_PATH + '.' + name + '._' + mod + '.' + value + '_test')
-                        tests.append(ModTest.Case) 
+                        tests.append(ModTest.Case)
 
         if len(tests):
             Tests = tests

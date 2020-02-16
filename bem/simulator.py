@@ -1,18 +1,14 @@
 import io
 from contextlib import redirect_stdout
-from numpy.fft import fft
+#from numpy.fft import fft
 from PySpice.Unit import u_ms, u_s
 from skidl import (KICAD, SPICE, Circuit, Net, search, set_default_tool, set_backup_lib,
                    subcircuit)
 
-from settings import default_temperature
+from .base import Block
+from .util import u
 
-from . import Block, u
-
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
+import builtins
 
 libs = ['./spice/']
 
@@ -30,7 +26,6 @@ class TailLogHandler(logging.Handler):
 
 
 class TailLogger(object):
-
     def __init__(self, maxlen):
         self._log_queue = collections.deque(maxlen=maxlen)
         self._log_handler = TailLogHandler(self._log_queue)
@@ -67,7 +62,7 @@ class Simulate:
 
         erc.addHandler(log_handler)
         builtins.default_circuit.ERC()
-        self.ERC = tail.contents() 
+        self.ERC = tail.contents()
         print(self.circuit)
 
         self.node = node
@@ -130,14 +125,14 @@ class Simulate:
 
     def transient(self, step_time=0.01 @ u_ms, end_time=200 @ u_ms):
         self.simulation = self.circuit.simulator()
-        analysis = self.simulation.transient(step_time=step_time, end_time=end_time) 
+        analysis = self.simulation.transient(step_time=step_time, end_time=end_time)
 
-        return self.measures(analysis) 
+        return self.measures(analysis)
 
-    def dc(self, params, temperature=None):
+    def dc(self, params, temperature=default_temperature):
         pins = self.block.get_pins().keys()
         measures = {}
-        for temp in temperature or default_temperature:
+        for temp in temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
 
             analysis = simulation.dc(**params)
@@ -145,10 +140,10 @@ class Simulate:
 
         return measures
 
-    def ac(self, temperature=None, **params):
+    def ac(self, temperature=default_temperature, **params):
         pins = self.block.get_pins().keys()
         measures = {}
-        for temp in temperature or default_temperature:
+        for temp in temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
             analysis = simulation.ac(**params)
             measures[str(temp)] = analysis

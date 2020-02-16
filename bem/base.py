@@ -7,12 +7,10 @@ from types import FunctionType
 import logging
 
 from PySpice.Unit import FrequencyValue, PeriodValue
+from PySpice.Unit.Unit import UnitValue
 import re
 
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ class Block:
     files = ['bem/base.py']
     inherited = []
 
-    doc_methods = ['willMount']
+    doc_methods = ['willMount'] # Methods that used for parameters description extraction
 
     def parse_argument(self, value):
         if callable(value):
@@ -36,6 +34,8 @@ class Block:
     def __init__(self, *args, **kwargs):
         sys.setprofile(None)
 
+        # Grab name of variable used for instance of this Block
+        # Traversal through call stack frames for search the same instance
         deph = 0
         ref = None
         while ref == None:
@@ -69,9 +69,16 @@ class Block:
             seen_add = seen.add
             return [x for x in seq if not (x in seen or seen_add(x))]
 
-        classes = list(inspect.getmro(self.__class__))
+        # Last class is object
+        classes = list(inspect.getmro(self.__class__))[:-1]
+        # Clear builder duplicates
+        classes = [cls for cls in classes if 'builder' not in str(cls)]
+
         classes.reverse()
-        classes = uniq_f7(classes)
+        # TODO: Possible duplications is bug
+        # classes = uniq_f7(classes)
+        print(classes)
+        # Call .willMount from all inherited classes
         for cls in classes:
             if hasattr(cls, 'willMount'):
                 mount_args_keys = inspect.getargspec(cls.willMount).args
@@ -92,9 +99,6 @@ class Block:
     def willMount(self):
         pass
 
-    # Title and Description
-    # def __instance__name__(self):
-    #     return [k for k,v in globals().items() if v is self]
     @property
     def SIMULATION(self):
         if hasattr(builtins, 'SIMULATION'):
@@ -112,20 +116,10 @@ class Block:
 
         return ' '.join(name)
 
-    def title(self):
-        # input = self.input
-        # output = self.output
-
-        # input_name = f'{input.part.name}_{input.name}' if hasattr(input, 'part') else f'{input.name}' if input else "NC"
-        # output_name = f'{output.part.name}_{output.name}' if hasattr(output, 'part') else f'{output.name}' if output else "NC"
-
-        # input_name = input_name.replace(self.name, '')
-        # output_name = output_name.replace(self.name, '')
-
-        # return label_prepare(input_name) + ' ⟶ ' + self.name + ' ⟶ ' + label_prepare(output_name)
-        return self.name
-
     def get_description(self):
+        """
+        From docsting of classes builded from.
+        """
         description = []
         for doc in [cls.__doc__ for cls in inspect.getmro(self) if cls.__doc__ and cls != object]:
             doc = '\n'.join([line.strip() for line in doc.split('\n')])
@@ -134,6 +128,9 @@ class Block:
         return description
 
     def get_params_description(self):
+        """
+        Get documentation from docstring of methods in `self.doc_methods` using pattern 'some_arg -- description'
+        """
         def is_proper_cls(cls):
             if cls == object:
                 return False
@@ -169,7 +166,6 @@ class Block:
 
     # Virtual Part
     def get_arguments(self):
-        # Instance = self if isinstance(self, type(self)) else self.__class__
         arguments = {}
         args = []
 
@@ -215,13 +211,7 @@ class Block:
                 }
             elif arg == 'Load' and type(default) == list and len(default) > 0:
                 default = default[0]
-                # arguments[arg] = {
-                #     'value': default.value * default.scale
-                #     'unit': {
-                #         'name': default.unit.unit_name,
-                #         'suffix': default.unit.unit_suffix
-                #     }
-                # }
+
                 arguments[arg] = {
                     'value': default.value * default.scale,
                     'unit': {
@@ -239,15 +229,15 @@ class Block:
         return arguments
 
     @classmethod
-    def parse_arguments(self, args):
-        arguments = self.get_arguments(self)
+    def parse_arguments(cls, args):
+        arguments = cls.get_arguments(cls)
         props = {}
         for attr in arguments:
-            props[attr] = copy(getattr(self, attr))
+            props[attr] = copy(getattr(cls, attr))
             if type(props[attr]) == list:
                 props[attr] = props[attr][0]
             arg = args.get(attr, None)
-            if arg: 
+            if arg:
                 if type(arg) == dict:
                     arg = arg.get('value', None)
                 if type(props[attr]) in [int, float]:
@@ -265,6 +255,9 @@ class Block:
 
 
     def get_ref(self):
+        """
+        Ref extracted from code variable name
+        """
         name = self.name.split('.')[-1]
         code = self.context['code']
 
@@ -291,7 +284,7 @@ class Block:
         params_default = inspect.getmembers(self, lambda a: not (inspect.isroutine(a)))
 
         params = {}
-        for param, default in params_default: 
+        for param, default in params_default:
             if param in inspect.getargspec(self.willMount).args:# or arguments.get(param, None):
                 continue
 
@@ -311,7 +304,7 @@ class Block:
                         'name': 'number'
                     }
                 }
-            elif type(default) == str and param not in ['title', 'name', '__module__']:
+            elif type(default) == str and param not in ['name', '__module__']:
                 params[param] = {
                     'value': default,
                     'unit': {

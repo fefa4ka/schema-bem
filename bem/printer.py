@@ -1,13 +1,7 @@
 from bem import Block, Build
 from skidl import Circuit, set_default_tool, KICAD, set_backup_lib
 from bem.abstract import Physical
-from bem.pcbmode import generate_netlist as pcbmode_netlist
-#from bem.yosys import generate_netlist as yosys_netlist
-
-try:
-    import __builtin__ as builtins
-except ImportError:
-    import builtins
+import builtins
 
 class Print:
     block = None
@@ -32,7 +26,7 @@ class Print:
     def netlist(self):
         for device in self.kit:
             device_name = device['library'] + ':' + device['name'][:device['name'].rfind('_')]
-            ref = device['library'] + ':' + device['name'][device['name'].rfind('_'):] 
+            ref = device['library'] + ':' + device['name'][device['name'].rfind('_'):]
             DeviceBlock = Physical(part=device_name, footprint=device['footprint'])(ref = ref).element
 
             for device_pin_name in device['pins'].keys():
@@ -41,16 +35,11 @@ class Print:
                     device_pin += getattr(self.block, pin)
 
         self.scheme.ERC()
-        if self.type == 'default':
-            return pcbmode_netlist(self.scheme)
-        elif self.type == 'yosys':
-            pass
-            #return yosys_netlist(self.scheme)
-        else:
-            return self.scheme.generate_netlist()
+
+        return self.scheme.generate_netlist()
 
     @classmethod
-    def body_kit(self, block):
+    def body_kit(cls, block):
         pins = block.get_pins() or []
         connected = [pin for pin in pins.keys() if len(pins[pin]) > 0]
 
