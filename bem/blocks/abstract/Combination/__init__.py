@@ -48,13 +48,8 @@ class Base(Physical()):
     #         self.value._value = float(self.value)
 
     def values(self):
-        values = []
-        
-        for part in self.available_parts():
-            values += self.part_values(part)
+        return self.part_values(self.selected_part)
 
-        return values
-    
     def part_values(self, part):
         values = []
 
@@ -68,25 +63,35 @@ class Base(Physical()):
                     exp_unit._value = pow(10, prefixes.get(exp, None) or int(exp))
 
                     scale = np.array(scales.strip().split(' ')).astype(float)
-                    
+
                     values += list(scale * exp_unit)
             else:
                 values += value.split(' ')
 
         return values
-                
+
     def available_parts(self):
         available_parts = super().available_parts()
         suited_parts = []
 
-        # self.unit_value()
+
+        error = 5
+        max_error = u(self.value) * error / 100
+        min_error = None
+        min_error_part = None
+
         for part in available_parts:
             for value in self.part_values(part):
                 if value == self.value:
                     suited_parts.append(part)
-        
-        if len(suited_parts) == 0:
-            suited_parts = [available_parts[0]]
+
+                error = abs(u(value) - u(self.value))
+                if max_error >= error and (min_error == None or min_error > error):
+                    min_error = error
+                    min_error_part = part
+
+        if len(suited_parts) == 0 and min_error_part:
+            suited_parts.append(min_error_part)
 
         filtered_parts = []
         if self.model:
@@ -97,13 +102,12 @@ class Base(Physical()):
         return filtered_parts if len(filtered_parts) > 0 else suited_parts
 
     def values_optimal(self, desire, error=10):
-        # return [desire]
         # TODO: make better
         closest = self.value_closest(desire)
 
         closest_value = u(closest)
         value = u(desire)
-        
+
         max_error = value * error / 100
         diff = value - closest_value
 
@@ -132,28 +136,22 @@ class Base(Physical()):
                 values.append([first_closest, second_closest])
 
         return values
-    
+
     def value_closest(self, value):
         absolute_value = u(value)
 
         closest = None
-        for unit in self.values():            
+        for unit in self.values():
             if not closest:
                 closest = unit
 
             unit_value = u(unit)
             closest_value = u(closest)
-            
+
             diff_unit = abs(absolute_value - unit_value)
             diff_closest = abs(absolute_value - closest_value)
 
             if diff_closest > diff_unit:
                 closest = unit
-        
-        if not closest or abs(u(closest) - u(value)) > u(value) * 0.1 :
-            closest = value
-        
-        closest = closest.canonise()
-        # closest._value = round(closest._value, 2)
 
         return closest

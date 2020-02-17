@@ -6,7 +6,7 @@ from pathlib import Path
 from collections import defaultdict
 
 from .base import Block
-from .util import u, is_tolerated
+from .util import u, is_tolerated, merge
 from .builder import Build
 from .stockman import Stockman
 from PySpice.Unit import *
@@ -76,10 +76,11 @@ def bem_scope_module(scopes, root=''):
         sys.modules[__name__ + root] = type(root, (object,), blocks)
 
 module_blocks = os.path.dirname(__file__) + '/blocks/'
-root = {
-    **bem_scope(module_blocks),
-    **bem_scope()
-}
+
+root = merge(
+    bem_scope(module_blocks),
+    bem_scope()
+)
 bem_scope_module(root)
 
 
@@ -93,7 +94,4 @@ class Byte(Unit):
     __default_unit__ = False
 
 _build_unit_shortcut(Byte())
-import os
-print(os.getcwd())
-print(__file__)
 

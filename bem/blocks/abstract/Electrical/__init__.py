@@ -64,9 +64,9 @@ class Base(Network(port='one')):
                 values.append(value)
                 value.element.ref = name + '_' + key.capitalize()
 
-        self.documentScheme()
+        self.annotate_pins_connections()
 
-    def documentScheme(self):
+    def annotate_pins_connections(self):
         pads = self.get_pins()
 
         for pad_name in pads.keys():

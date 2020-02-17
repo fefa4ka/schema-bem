@@ -7,7 +7,7 @@ class Modificator(Base):
         'input_n': True,
         'output_n': True,
         'v_ref': True,
-        'gnd': True 
+        'gnd': True
     }
 
     input = None
@@ -20,10 +20,10 @@ class Modificator(Base):
         if self.output and instance.input:
             self.output._name = instance.input._name = f'{self.name}{instance.name}_Net'
             self.output += instance.input
-        
+
         if self.output_n and instance.input_n:
             self.output_n += instance.input_n
-        
+
         self.connect_power_bus(instance)
 
     def __parallel__(self, instance):

@@ -146,7 +146,6 @@ class Build:
         self.files = uniq_f7(self.files)
         self.files.reverse()
 
-        print('\nBUILD:', self.name, Models, self.files)
         Block = type(self.name,
                     tuple(Models),
                     {

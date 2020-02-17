@@ -69,7 +69,6 @@ class Block:
         # Clear builder duplicates
         classes = [cls for cls in classes if 'builder' not in str(cls)]
         classes.reverse()
-        print(classes)
         # Call .willMount from all inherited classes
         for cls in classes:
             if hasattr(cls, 'willMount'):
@@ -77,7 +76,7 @@ class Block:
                 mount_kwargs = kwargs.copy()
                 if len(mount_args_keys) == 1:
                     args = []
-                
+
                 for arg in mount_args_keys:
                     if hasattr(self, arg) and isinstance(getattr(self, arg), FunctionType):
                         value = getattr(self, arg)(self)

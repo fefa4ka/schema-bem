@@ -31,7 +31,7 @@ class Base(Block):
         if len(pin_ids) == 1 and hasattr(self, str(pin_ids[0])):
             return getattr(self, pin_ids[0])
 
-        if self.element:
+        if hasattr(self, 'element'):
             return self.element.__getitem__(*pin_ids, **criteria)
 
         return None
@@ -56,15 +56,6 @@ class Base(Block):
             self.output += instance[0]
 
             return instance
-            # try:
-            #     ntwk = instance.create_network()
-            # except AttributeError:
-            #     raise Exception
-
-            # self.output += ntwk[0]
-
-            # return ntwk[-1]
-            # return Network(self.output, ntwk[-1])
 
         raise Exception
 
@@ -100,18 +91,10 @@ class Base(Block):
         elif type(instance) == NetPinList:
             return self.__and__(instance[0])
         else:
-            # try:
-            #     ntwk = instance.create_network()
-            # except AttributeError:
-            #     raise Exception
-
             self.input += instance[0]
             self.output += instance[-1]
 
             return self
-
-    def create_network(self):
-        return [self.input, self.output]
 
     def connect_power_bus(self, instance):
         if self.gnd and instance.gnd:
@@ -131,13 +114,13 @@ class Base(Block):
         return pins
 
     def get_pins_definition(self):
-        pins = self.pins 
+        pins = self.pins
         pins = pins if type(pins) == dict else pins()
 
         return pins
 
     def set_pins(self):
-        pins = self.get_pins_definition() 
+        pins = self.get_pins_definition()
         for pin in pins.keys():
             pin_description = [pins[pin]] if type(pins[pin]) == bool else pins[pin]
             device_name = ''.join([name for name in self.name.split('.') if name[0] == name[0].upper()])
@@ -148,7 +131,7 @@ class Base(Block):
             # pin = True, str -- Net(pin_name | str)
             # pin = Int -- Bus(pin_name, Int)
             original_net = getattr(self, pin) if hasattr(self, pin) else None
-            if type(pin_description) in [list, tuple]: 
+            if type(pin_description) in [list, tuple]:
                 for pin_data in pin_description:
                     if type(pin_data) == str:
                         net_name = device_name + pin_data

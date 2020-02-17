@@ -14,32 +14,6 @@ class Base(Electrical()):
     units = 1
 
     def __init__(self, *args, **kwargs):
-        if not hasattr(self, 'unit'):
-            self.unitsInit(*args, **kwargs) 
-        else:
-            kwargs['circuit'] = False
-            super().__init__(*args, **kwargs)
-
-            self.part_aliases()
-
-            self.release()
-
-    def __getitem__(self, *attrs_or_pins, **criteria):
-        if hasattr(self, 'selected_part') and len(attrs_or_pins) == 1:
-            attr = attrs_or_pins[0]
-            if attr and type(attr) == str:
-                attr_value = self.selected_part.spice_params.get(attr, None) 
-                if attr_value:
-                    return attr_value
-                else:
-                    params = [entry.value for entry in self.selected_part.params.where(Param.name == attr)]
-                    if len(params):
-                        return params[0]
-
-        return super().__getitem__(*attrs_or_pins, **criteria)
-
-
-    def unitsInit(self, *args, **kwargs):
         units = self.props.get('units', 1)
 
         params = {
@@ -79,6 +53,21 @@ class Base(Electrical()):
                 unit_queue = list(set(unit_queue + instance.units))
                 unit_queue.remove(unit)
 
+    def __getitem__(self, *attrs_or_pins, **criteria):
+        if hasattr(self, 'selected_part') and len(attrs_or_pins) == 1:
+            attr = attrs_or_pins[0]
+            if attr and type(attr) == str:
+                attr_value = self.selected_part.spice_params.get(attr, None)
+                if attr_value:
+                    return attr_value
+                else:
+                    params = [entry.value for entry in self.selected_part.params.where(Param.name == attr)]
+                    if len(params):
+                        return params[0]
+
+        return super().__getitem__(*attrs_or_pins, **criteria)
+
+
     def unitMount(self, unit, args, props, params):
         instance = self
         if unit != self.units[0]:
@@ -89,21 +78,22 @@ class Base(Electrical()):
         setattr(instance, 'props', props)
         setattr(instance, 'unit', unit)
 
-        instance.__init__(*args, **params)
+        params['circuit'] = False
+        if unit == self.units[0]:
+            super().__init__(*args, **params)
+        else:
+            instance.__init__(*args, **params)
+
+        instance.part_aliases()
+
+        instance.release()
 
         return instance
 
     def willMount(self, model=None):
-        # pass
         part = self.props.get('part', None)
 
         if part:
-            # library, device = part.split(':')
-            # part = {
-            #     model: device
-            # }
-
-            # self.selected_part = part
             self.selected_part = part
             self.template = self.part_template()
 
@@ -116,15 +106,7 @@ class Base(Electrical()):
         parts = Stockman(self).suitable_parts()
 
         if len(parts) == 0:
-            args = self.get_arguments()
-            params = self.get_params()
-            values = {
-                **args,
-                **params
-            }
-            description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
-
-            raise LookupError("There are should be parts in stock for %s block with suitable characteristics\n%s" % (self.name, description))
+            raise_error(self)
 
         return parts
 
@@ -142,6 +124,9 @@ class Base(Electrical()):
         return part
 
     def apply_part(self, part):
+        if part == None:
+            raise_error(self)
+
         self.selected_part = part
 
         if self.selected_part.model != self.model:
@@ -242,3 +227,15 @@ class Base(Electrical()):
                 self.template.set_pin_alias(alias, pin)
 
             self.template[pin].aliases = { alias for alias in aliases }
+
+
+def raise_error(self):
+    args = self.get_arguments()
+    params = self.get_params()
+    values = {
+        **args,
+        **params
+    }
+    description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
+
+    raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (self.name, description))

@@ -1,13 +1,13 @@
-from bem import Block, bem_scope
 import os
 
 # KiCAD modules and footprints paths
 os.environ['KISYSMOD'] = '/Users/fefa4ka/Development/schema.vc/kicad/modules'
 os.environ['KICAD_SYMBOL_DIR'] = '/Users/fefa4ka/Development/schema.vc/kicad/library'
-
 # Path where is libngspice.dylib placed
 os.environ['DYLD_LIBRARY_PATH'] = '/usr/local/Cellar/libngspice/28/lib/'
 
+from bem import Block, bem_scope, u_V, u_Ohm
+from bem.model import Part, Param
 
 def test_bem_scope():
     blocks = bem_scope()
@@ -49,7 +49,6 @@ def test_bem_build():
     assert instance.mods == {}, "Mods should not set for Base block"
     assert instance.props == {}, "Props should not set for this instance"
     assert len(instance.files) == 2, "Only from two files block should be builded"
-    print(instance.files)
     assert instance.files[0] == 'blocks/example/Base/__init__.py', "Front file should be Base/__init__.py"
     assert instance.files[1] == 'bem/base.py', "Last file should be bem/base.py"
 
@@ -108,16 +107,97 @@ def test_bem_modificator():
 def test_network():
     from bem.abstract import Network
     one = Network(port='one')()
-    interface = Network(interface='i2c')()
-    print(one.mods, interface.mods)
+    second = Network(port='one')()
+    two = Network(port='two')()
+    dubl_two = Network(port='two')()
 
-def test_resistor():
+    assert len(one.get_pins().keys()) == 4, "In Network port=one should be 4 pins"
+    assert len(two.get_pins().keys()) == 6, "In Network port=two should be 6 pins"
+
+    assert one.output.is_attached(second.input) == False, "Pins should not connected"
+    link = one & second
+    assert link == second, "Link should be last connected element"
+    assert one.output.is_attached(second.input), "Pins should connected"
+
+    assert (two.output.is_attached(dubl_two.input) or two.output_n.is_attached(dubl_two.input_n)) == False, "Two port should disconnected"
+    double_link = two & dubl_two
+    assert double_link == dubl_two, "Link should be last connected element"
+    assert two.output.is_attached(dubl_two.input) and two.output_n.is_attached(dubl_two.input_n), "Two port should connected"
+
+    interface = Network(interface='i2c')()
+    interface_double = Network(interface=['i2c', 'uart'])()
+
+def test_resistor(value=100):
     from bem.basic import Resistor
-    r = Resistor()(100)
+
+    """
+    try:
+        r = Resistor()(100)
+        assert False, "Resistor should raise LookupError"
+    except LookupError:
+        part = Part(block='basic.Resistor',
+            model='',
+            library='Device',
+            symbol='R',
+            footprint='Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal',
+            datasheet='',
+            description='',
+            spice=''
+        )
+        part.save()
+
+        param = Param(name='value', value=value + 2)
+        param.save()
+        part.params.add(param)
+"""
+
+    part = Part(block='basic.Resistor',
+        model='',
+        library='Device',
+        symbol='R',
+        footprint='Resistor_SMD:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal',
+        datasheet='',
+        description='',
+        spice=''
+    )
+    part.save()
+
+    param = Param(name='value', value=value * 10)
+    param.save()
+    part.params.add(param)
+
+    param = Param(name='value', value=value * 1.03)
+    param.save()
+    part.params.add(param)
+
+
+    part = Part(block='basic.Resistor',
+        model='',
+        library='Device',
+        symbol='R',
+        footprint='Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal',
+        datasheet='',
+        description='',
+        spice=''
+    )
+    part.save()
+
+    param = Param(name='value', value=value * 2)
+    param.save()
+    part.params.add(param)
+
+    param = Param(name='value', value=value *1.02)
+    param.save()
+    part.params.add(param)
+
+    r = Resistor()(value @ u_Ohm, V=10 @ u_V, Load=100 @ u_Ohm)
+    assert r.value == value * 1.02, "Resistor should be as selected with tolerance error"
 
 test_bem_scope()
+
 test_bem_build()
 test_bem_inherited_build()
 test_bem_modificator()
 test_network()
-#test_resistor()
+
+test_resistor(1234)
