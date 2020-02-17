@@ -15,6 +15,7 @@ libs = ['./spice/']
 import logging
 import collections
 
+default_temperature = [0, 25, 40]
 
 class TailLogHandler(logging.Handler):
     def __init__(self, log_queue):

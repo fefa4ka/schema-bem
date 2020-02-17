@@ -75,8 +75,11 @@ def bem_scope_module(scopes, root=''):
     if root:
         sys.modules[__name__ + root] = type(root, (object,), blocks)
 
-
-root = bem_scope()
+module_blocks = os.path.dirname(__file__) + '/blocks/'
+root = {
+    **bem_scope(module_blocks),
+    **bem_scope()
+}
 bem_scope_module(root)
 
 
@@ -90,4 +93,7 @@ class Byte(Unit):
     __default_unit__ = False
 
 _build_unit_shortcut(Byte())
+import os
+print(os.getcwd())
+print(__file__)
 

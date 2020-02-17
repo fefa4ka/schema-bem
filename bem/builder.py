@@ -1,5 +1,6 @@
 import importlib
 import logging
+import os
 from pathlib import Path
 
 from .base import Block as BaseBlock
@@ -9,7 +10,6 @@ from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
-BLOCKS_PATH = 'blocks'
 
 class Build:
     name = None
@@ -29,8 +29,17 @@ class Build:
 
         block_dir = self.name.replace('.', '/')
 
+        BLOCKS_PATH = MODULE_PATH = 'blocks'
         base_file = Path(BLOCKS_PATH) / block_dir / ('__init__.py')
-        self.base = base_file.exists() and importlib.import_module(BLOCKS_PATH + '.' + self.name).Base
+
+        # Look for bem module blocks if local doesn't exists
+        if not base_file.exists():
+            module_path = os.path.dirname(__file__)
+            BLOCKS_PATH = str(Path(module_path) / Path(BLOCKS_PATH))
+            base_file = Path(BLOCKS_PATH) / block_dir / ('__init__.py')
+            MODULE_PATH = 'bem.' + MODULE_PATH 
+
+        self.base = base_file.exists() and importlib.import_module(MODULE_PATH + '.' + self.name).Base
 
         if self.base:
             self.files.append(str(base_file))
@@ -54,13 +63,12 @@ class Build:
                     for mod_block_dir in set([block_dir]):
                         module_file = Path(BLOCKS_PATH) / mod_block_dir / ('_' + mod) / (value + '.py')
                         if module_file.exists():
-                            Module = importlib.import_module(BLOCKS_PATH + '.' + mod_block_dir.replace('/', '.') + '._' + mod + '.' + value)
+                            Module = importlib.import_module(MODULE_PATH + '.' + mod_block_dir.replace('/', '.') + '._' + mod + '.' + value)
                             self.models.append(Module.Modificator)
 
                             if hasattr(Module.Modificator, 'files'):
                                 self.files += Module.Modificator.files
                                 self.files.append(str(module_file))
-                                print(mod, value, Module.Modificator.files)
 
                             mods = Module.Modificator.mods if hasattr(Module.Modificator, 'mods') else None
                             if mods:
@@ -74,13 +82,16 @@ class Build:
 
             for key, value in self.props.items():
                 del self.mods[key]
+
+            self.files = sorted(set(self.files), key=self.files.index)
+            self.files.reverse()
+
+            if type(self.base.files) == list:
+                self.files += list(self.base.files)
         else:
             self.props = kwargs
 
-        self.files = sorted(set(self.files), key=self.files.index)
-        self.files.reverse()
-        if type(self.base.files) == list:
-            self.files += list(self.base.files)
+
 
 
     # Run once
@@ -135,7 +146,7 @@ class Build:
         self.files = uniq_f7(self.files)
         self.files.reverse()
 
-        print('BUILD:', self.name, Models, self.files)
+        print('\nBUILD:', self.name, Models, self.files)
         Block = type(self.name,
                     tuple(Models),
                     {

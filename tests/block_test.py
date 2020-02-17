@@ -105,7 +105,19 @@ def test_bem_modificator():
     assert 'small' in instance_multiply_mods and 'big' in instance_multiply_mods, "Mod should be size = small, big"
     instance_multiply_mod = Complex(size=['big', 'small'])(some_arg=123)
 
+def test_network():
+    from bem.abstract import Network
+    one = Network(port='one')()
+    interface = Network(interface='i2c')()
+    print(one.mods, interface.mods)
+
+def test_resistor():
+    from bem.basic import Resistor
+    r = Resistor()(100)
+
 test_bem_scope()
 test_bem_build()
 test_bem_inherited_build()
 test_bem_modificator()
+test_network()
+#test_resistor()

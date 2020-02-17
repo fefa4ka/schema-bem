@@ -64,35 +64,29 @@ class Block:
         self.mount(*args, **kwargs)
 
     def mount(self, *args, **kwargs):
-        def uniq_f7(seq):
-            seen = set()
-            seen_add = seen.add
-            return [x for x in seq if not (x in seen or seen_add(x))]
-
         # Last class is object
         classes = list(inspect.getmro(self.__class__))[:-1]
         # Clear builder duplicates
         classes = [cls for cls in classes if 'builder' not in str(cls)]
-
         classes.reverse()
-        # TODO: Possible duplications is bug
-        # classes = uniq_f7(classes)
         print(classes)
         # Call .willMount from all inherited classes
         for cls in classes:
             if hasattr(cls, 'willMount'):
                 mount_args_keys = inspect.getargspec(cls.willMount).args
-
+                mount_kwargs = kwargs.copy()
+                if len(mount_args_keys) == 1:
+                    args = []
+                
                 for arg in mount_args_keys:
                     if hasattr(self, arg) and isinstance(getattr(self, arg), FunctionType):
                         value = getattr(self, arg)(self)
                         setattr(self, arg, value)
-                        kwargs[arg] = value
+                        mount_kwargs[arg] = value
                     elif isinstance(kwargs.get(arg, None), FunctionType):
-                        kwargs[arg] = kwargs[arg](self)
+                        mount_kwargs[arg] = kwargs[arg](self)
 
-                mount_args = {key: value for key, value in kwargs.items() if key in mount_args_keys}
-
+                mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
 
                 cls.willMount(self, *args, **mount_args)
 
