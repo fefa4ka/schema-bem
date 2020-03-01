@@ -15,7 +15,8 @@ libs = ['./spice/']
 import logging
 import collections
 
-default_temperature = [0, 25, 40]
+from PySpice.Unit import u_Degree
+default_temperature = [-30, 0, 25] @ u_Degree
 
 class TailLogHandler(logging.Handler):
     def __init__(self, log_queue):
@@ -133,7 +134,7 @@ class Simulate:
     def dc(self, params, temperature=default_temperature):
         pins = self.block.get_pins().keys()
         measures = {}
-        for temp in temperature:
+        for temp in temperature or default_temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
 
             analysis = simulation.dc(**params)
@@ -144,7 +145,7 @@ class Simulate:
     def ac(self, temperature=default_temperature, **params):
         pins = self.block.get_pins().keys()
         measures = {}
-        for temp in temperature:
+        for temp in temperature or default_temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
             analysis = simulation.ac(**params)
             measures[str(temp)] = analysis

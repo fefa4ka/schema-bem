@@ -169,11 +169,25 @@ class Base(Physical()):
         return
 
     def circuit(self):
+        # TODO: Wrong implementation
+
+        if self.SIMULATION:
+            element = self.part_spice(value=self.value)
+            if element:
+                self.element = element
+
+                self.input += self.element[1]
+                self.output += self.element[2]
+
+            return
+        else:
+            Builder = self.template
+
         # TODO: error from settings
         values = self.values_optimal(self.value, error=15) #if not self.SIMULATION else [self.value]
         elements = []
         # print(f'{self.value} by {values}')
-
+        
         total_value = 0
         for index, value in enumerate(values):
             if type(value) == list:
@@ -182,8 +196,11 @@ class Base(Physical()):
 
                 for part in value:
                     part = u(part)
-                    r = self.part(value=part)
-                    r.ref = self.get_ref()
+                    unit = self.value.clone()
+                    unit._value = part
+                    unit = unit.canonise()
+
+                    r = Builder(value=unit)
                     total_value += part / 2 if self.increase else part
 
                     r[1] += parallel_in
@@ -197,7 +214,10 @@ class Base(Physical()):
 
             else:
                 value = u(value)
-                r = self.part(value=u(value))
+                unit = self.value.clone()
+                unit._value = value 
+                unit = unit.canonise()
+                r = Builder(value=unit)
                 total_value += value if self.increase else value / 2
 
                 self.element = r
@@ -215,8 +235,8 @@ class Base(Physical()):
         self.output += elements[-1][2]
 
     def parallel_sum(self, values):
-        return (1 / sum(1 / np.array(values))) if self.instance else sum(values)
+        return (1 / sum(1 / np.array(values))) if self.increase else sum(values)
 
     def series_sum(self, values):
-        return sum(values) if self.instance else 1 / sum(1 / np.array(values))
+        return sum(values) if self.increase else 1 / sum(1 / np.array(values))
 

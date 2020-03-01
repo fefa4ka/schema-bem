@@ -6,6 +6,8 @@ from collections import defaultdict
 from copy import copy
 import string
 from bem.model import Param
+import sys
+
 
 class Base(Electrical()):
     model = ''
@@ -198,7 +200,9 @@ class Base(Electrical()):
 
     def part(self, *args, **kwargs):
         # Only one instance of Part could be used in Block
-        if not hasattr(self.parent, '_part'):
+        if not hasattr(self.parent, '_part') or self.parent._part == None:
+            tracer = sys.getprofile()
+            sys.setprofile(None)
             if self.SIMULATION:
                 part = self.part_spice(*args, **kwargs)
             else:
@@ -211,6 +215,7 @@ class Base(Electrical()):
                 part.set_pin_alias('-', 2)
 
             self.parent._part = part
+            sys.setprofile(tracer)
 
         part = self.parent._part
         part.ref = self.ref or self.get_ref()

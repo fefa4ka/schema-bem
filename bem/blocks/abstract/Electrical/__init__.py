@@ -59,10 +59,11 @@ class Base(Network(port='one')):
         values = []
         name = self.name.split('.')[-1]
         for key, value in self.circuit_locals.items():
-            if key != 'self'and value not in values and hasattr(value, 'element') and value.element: 
+            #values = [entry for entry in values if type(value) == type(entry)]
+            if key != 'self' and value not in values and hasattr(value, 'element') and value.element: 
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
                 values.append(value)
-                value.element.ref = name + '_' + key.capitalize()
+                value.element.ref = name + '_' + key
 
         self.annotate_pins_connections()
 

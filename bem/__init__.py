@@ -9,7 +9,6 @@ from .base import Block
 from .util import u, is_tolerated, merge
 from .builder import Build
 from .stockman import Stockman
-from PySpice.Unit import *
 from skidl import Net, set_default_tool, set_backup_lib, KICAD
 import builtins
 
@@ -77,11 +76,12 @@ def bem_scope_module(scopes, root=''):
 
 module_blocks = os.path.dirname(__file__) + '/blocks/'
 
-root = merge(
+bem_scope_dict = merge(
     bem_scope(module_blocks),
     bem_scope()
 )
-bem_scope_module(root)
+
+bem_scope_module(bem_scope_dict)
 
 
 # Digital Units
@@ -95,3 +95,4 @@ class Byte(Unit):
 
 _build_unit_shortcut(Byte())
 
+from PySpice.Unit import *

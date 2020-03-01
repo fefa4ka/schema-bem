@@ -41,12 +41,9 @@ class Interfaced(Base):
         instance_power_crc = power_crc(instance)
 
         instance_interfaces = instance.mods.get('interface', None) or instance.props.get('interface', None) or []
-        print('instance', instance_interfaces)
         for protocol in instance_interfaces:
             self_interfaces = self.mods.get('interface', None) or self.props.get('interface', None) or []
-            print('self', self_interfaces)
             if protocol in self_interfaces:
-                print('connect:', protocol)
                 interface = getattr(self, protocol)
                 interface(instance)
 

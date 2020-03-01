@@ -31,11 +31,13 @@ class Base(Block):
         if len(pin_ids) == 1 and hasattr(self, str(pin_ids[0])):
             return getattr(self, pin_ids[0])
 
-        if hasattr(self, 'element'):
+        if hasattr(self, 'element') and self.element:
             return self.element.__getitem__(*pin_ids, **criteria)
 
         return None
 
+    def create_network(self):
+        return [self.input, self.output]
 
     def __and__(self, instance):
         if issubclass(type(instance), Block):
