@@ -86,7 +86,6 @@ class Block:
                         mount_kwargs[arg] = kwargs[arg](self)
 
                 mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
-
                 cls.willMount(self, *args, **mount_args)
 
     def willMount(self):

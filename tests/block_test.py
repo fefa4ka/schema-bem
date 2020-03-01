@@ -105,6 +105,8 @@ def test_bem_modificator():
     instance_multiply_mod = Complex(size=['big', 'small'])(some_arg=123)
 
 def test_network():
+    import builtins
+    builtins.SIMULATION = True
     from bem.abstract import Network
     one = Network(port='one')()
     second = Network(port='one')()
@@ -130,27 +132,6 @@ def test_network():
 def test_resistor(value=100):
     from bem.basic import Resistor
 
-    """
-    try:
-        r = Resistor()(100)
-        assert False, "Resistor should raise LookupError"
-    except LookupError:
-        part = Part(block='basic.Resistor',
-            model='',
-            library='Device',
-            symbol='R',
-            footprint='Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal',
-            datasheet='',
-            description='',
-            spice=''
-        )
-        part.save()
-
-        param = Param(name='value', value=value + 2)
-        param.save()
-        part.params.add(param)
-"""
-
     part = Part(block='basic.Resistor',
         model='',
         library='Device',
@@ -162,7 +143,7 @@ def test_resistor(value=100):
     )
     part.save()
 
-    param = Param(name='value', value=value * 10)
+    param = Param(name='value', value=value * 2)
     param.save()
     part.params.add(param)
 
@@ -182,22 +163,43 @@ def test_resistor(value=100):
     )
     part.save()
 
-    param = Param(name='value', value=value * 2)
+    param = Param(name='value', value=value / 4)
     param.save()
     part.params.add(param)
 
-    param = Param(name='value', value=value *1.02)
+    param = Param(name='value', value=value * 1.02)
     param.save()
     part.params.add(param)
 
-    r = Resistor()(value @ u_Ohm, V=10 @ u_V, Load=100 @ u_Ohm)
-    assert r.value == value * 1.02, "Resistor should be as selected with tolerance error"
+    test_impeadance = Resistor()(value @ u_Ohm, V=5 @ u_V, Load=570 @ u_Ohm)
+    assert test_impeadance.value == value * 1.02, "Resistor should be as selected with tolerance error"
+    assert test_impeadance.get_ref() == 'TestImpeadance' and test_impeadance.element.ref == 'TestImpeadance', 'Ref should be the same as variable name in code'
+    assert test_impeadance.get_params()['V_drop']['value'] == 1.2, "V_drop should be 1.2 V for V == 5, Load = 570 Ohm"
+
+    next_impeadance = Resistor()(240 @ u_Ohm, V=5 @ u_V - test_impeadance.V_drop, Load=330 @ u_Ohm)
+
+    assert next_impeadance.get_ref() == 'NextImpeadance' and next_impeadance.element.ref == 'NextImpeadance', 'Ref should be the same as variable name in code'
+    assert next_impeadance.get_params()['V_drop']['value'] == 1.6, "V_drop should be 1.6 V"
+
+    last_impeadance = Resistor()(330 @ u_Ohm, V=5 @ u_V - test_impeadance.V_drop - next_impeadance.V_drop, Load=1 @ u_Ohm)
+    assert last_impeadance.get_params()['V_drop']['value'] == 2.2, "V_drop should be 1.2 V"
+
+
+    # Simulation test
+    from bem.basic.source import VS
+
+    dc = VS(flow='V')(V=10 @ u_V)
+
+    dc & test_impeadance & next_impeadance & last_impeadance & dc
+
+    from bem.simulator import Simulate
+    # Simulation could be done from every used Block in schema
+    Simulate(test_impeadance).transient()
+
 
 test_bem_scope()
-
 test_bem_build()
 test_bem_inherited_build()
 test_bem_modificator()
 test_network()
-
-test_resistor(1234)
+test_resistor(180)

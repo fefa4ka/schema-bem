@@ -5,6 +5,7 @@ from PySpice import Spice
 from PySpice.Unit import FrequencyValue, PeriodValue, SiUnits
 from PySpice.Unit.Unit import UnitValue
 
+from skidl import Net
 from bem import Block, u
 from bem.abstract import Physical
 from bem.model import Param
@@ -16,7 +17,6 @@ prefixes['0'] = 0
 
 
 class Base(Physical()):
-    #inherited = [Physical]
     increase = True
     value = 0
 
@@ -48,7 +48,12 @@ class Base(Physical()):
     #         self.value._value = float(self.value)
 
     def values(self):
-        return self.part_values(self.selected_part)
+        values = []
+
+        for part in self.available_parts():
+            values += self.part_values(part)
+
+        return values
 
     def part_values(self, part):
         values = []
@@ -74,7 +79,6 @@ class Base(Physical()):
         available_parts = super().available_parts()
         suited_parts = []
 
-
         error = 5
         max_error = u(self.value) * error / 100
         min_error = None
@@ -86,12 +90,15 @@ class Base(Physical()):
                     suited_parts.append(part)
 
                 error = abs(u(value) - u(self.value))
-                if max_error >= error and (min_error == None or min_error > error):
+                if min_error == None or min_error > error:
                     min_error = error
                     min_error_part = part
 
-        if len(suited_parts) == 0 and min_error_part:
-            suited_parts.append(min_error_part)
+        if len(suited_parts) == 0:
+            if max_error > min_error and min_error_part:
+                suited_parts.append(min_error_part)
+            else:
+                suited_parts = available_parts
 
         filtered_parts = []
         if self.model:
@@ -101,7 +108,7 @@ class Base(Physical()):
 
         return filtered_parts if len(filtered_parts) > 0 else suited_parts
 
-    def values_optimal(self, desire, error=10):
+    def values_optimal(self, desire, error=10, error_threshold=0):
         # TODO: make better
         closest = self.value_closest(desire)
 
@@ -111,27 +118,28 @@ class Base(Physical()):
         max_error = value * error / 100
         diff = value - closest_value
 
+        if not error_threshold:
+            error_threshold = max_error
+
+        # if available parts too far from desire
+        if diff / error_threshold > 2:
+            self.part_unavailable()
+
         values = []
-        if max_error > abs(diff):
+        if max_error > abs(diff) or abs(diff) < error_threshold:
             values = [closest]
         else:
-            diff_unit = desire.clone()
-
             if (diff > 0 and self.increase) or (diff < 0 and not self.increase):
                 values = [closest]
 
-                diff_unit._value = diff
-
-                diff_closest = self.values_optimal(diff_unit)
+                diff_closest = self.values_optimal(abs(diff), error_threshold=error_threshold)
 
                 values += diff_closest
             else:
-                diff_unit._value = diff * 2
-                first_closest = self.value_closest(diff_unit)
+                first_closest = self.value_closest(diff * 2)
                 first_value = u(first_closest)
-                second_value = diff * first_value / (diff - first_value)
-                diff_unit._value = abs(second_value)
-                second_closest = self.value_closest(diff_unit)
+                second_value = first_value * diff / (diff - first_value)
+                second_closest = self.value_closest(abs(second_value))
 
                 values.append([first_closest, second_closest])
 
@@ -155,3 +163,60 @@ class Base(Physical()):
                 closest = unit
 
         return closest
+
+    def part_aliases(self):
+        # TODO: Possibility to apply resistors array
+        return
+
+    def circuit(self):
+        # TODO: error from settings
+        values = self.values_optimal(self.value, error=15) #if not self.SIMULATION else [self.value]
+        elements = []
+        # print(f'{self.value} by {values}')
+
+        total_value = 0
+        for index, value in enumerate(values):
+            if type(value) == list:
+                parallel_in = Net('CombinationArrayIn_' + str(index))
+                parallel_out = Net('CombinationArrayOut_' + str(index))
+
+                for part in value:
+                    part = u(part)
+                    r = self.part(value=part)
+                    r.ref = self.get_ref()
+                    total_value += part / 2 if self.increase else part
+
+                    r[1] += parallel_in
+                    r[2] += parallel_out
+
+                if index:
+                    previous_r = elements[-1]
+                    previous_r[2] += parallel_in
+
+                elements.append((None, parallel_in, parallel_out))
+
+            else:
+                value = u(value)
+                r = self.part(value=u(value))
+                total_value += value if self.increase else value / 2
+
+                self.element = r
+                self.element.ref = self.get_ref()
+
+                if index:
+                    previous_r = elements[-1]
+                    previous_r[2] += r[1]
+
+                elements.append(r)
+
+        self.value = total_value
+
+        self.input += elements[0][1]
+        self.output += elements[-1][2]
+
+    def parallel_sum(self, values):
+        return (1 / sum(1 / np.array(values))) if self.instance else sum(values)
+
+    def series_sum(self, values):
+        return sum(values) if self.instance else 1 / sum(1 / np.array(values))
+

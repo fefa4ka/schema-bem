@@ -106,7 +106,7 @@ class Base(Electrical()):
         parts = Stockman(self).suitable_parts()
 
         if len(parts) == 0:
-            raise_error(self)
+            self.part_unavailable(self)
 
         return parts
 
@@ -125,7 +125,7 @@ class Base(Electrical()):
 
     def apply_part(self, part):
         if part == None:
-            raise_error(self)
+            self.part_unavailable(self)
 
         self.selected_part = part
 
@@ -161,6 +161,7 @@ class Base(Electrical()):
             library = stock.library
             symbol = stock.symbol
 
+        # TODO: Very slow func. Speedup Part loading, Cache?
         part = Part(library, symbol, footprint=self.footprint, dest=TEMPLATE)
 
         return part
@@ -168,8 +169,6 @@ class Base(Electrical()):
     def part_aliases(self):
         if not hasattr(self.selected_part, 'pins'):
             return
-
-        part = self.part()
 
         units = defaultdict(lambda: defaultdict(list))
         for pin in self.selected_part.pins:
@@ -179,12 +178,14 @@ class Base(Electrical()):
         if not units.get(self.unit, None):
             return
 
+        part = self.part()
+
         # for unit in units.keys():
         for block_pin in units[self.unit].keys():
             for part_pin in units[self.unit][block_pin]:
                 pin_number = int(part_pin.split('/')[1])
                 device_name = self.name.replace('.', '')
-                net_name = device_name + ''.join([word.capitalize() for word in block_pin.split('_')]) + str(pin_number)
+                net_name =  device_name + ''.join([word.capitalize() for word in block_pin.split('_')]) + str(pin_number)
                 pin_net = Net(net_name)
                 pin_net += part[pin_number]
 
@@ -196,6 +197,7 @@ class Base(Electrical()):
         return part(*args, **kwargs)
 
     def part(self, *args, **kwargs):
+        # Only one instance of Part could be used in Block
         if not hasattr(self.parent, '_part'):
             if self.SIMULATION:
                 part = self.part_spice(*args, **kwargs)
@@ -204,8 +206,8 @@ class Base(Electrical()):
 
             if len(part.pins) == 2:
                 part.set_pin_alias('p', 1)
-                part.set_pin_alias('n', 2)
                 part.set_pin_alias('+', 1)
+                part.set_pin_alias('n', 2)
                 part.set_pin_alias('-', 2)
 
             self.parent._part = part
@@ -229,13 +231,13 @@ class Base(Electrical()):
             self.template[pin].aliases = { alias for alias in aliases }
 
 
-def raise_error(self):
-    args = self.get_arguments()
-    params = self.get_params()
-    values = {
-        **args,
-        **params
-    }
-    description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
+    def part_unavailable(self):
+        args = self.get_arguments()
+        params = self.get_params()
+        values = {
+            **args,
+            **params
+        }
+        description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
 
-    raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (self.name, description))
+        raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (self.name, description))
