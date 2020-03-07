@@ -89,7 +89,7 @@ class Base(Block):
         if issubclass(type(instance), Block):
             self.__parallel__(instance)
 
-            return NetPinList([self, instance])
+            return self # NetPinList([self, instance])
         elif type(instance) == NetPinList:
             return self.__and__(instance[0])
         else:
@@ -97,6 +97,8 @@ class Base(Block):
             self.output += instance[-1]
 
             return self
+
+        raise Exception
 
     def connect_power_bus(self, instance):
         if self.gnd and instance.gnd:

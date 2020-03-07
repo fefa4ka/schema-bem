@@ -40,6 +40,13 @@ class Base(Network(port='one')):
     def release(self):
         self.circuit_locals = {}
 
+        name = self.get_ref()
+
+        # TODO: Hack for schema-explorer
+        self.ref = self.name if name in ['Block', 'Instance'] else name
+        name = self.ref
+        name = name.split('.')[-1]
+
         def tracer(frame, event, arg, self=self):
             if event == 'return':
                 self.circuit_locals = frame.f_locals
@@ -57,10 +64,9 @@ class Base(Network(port='one')):
             sys.setprofile(tracer_instances[-1])
 
         values = []
-        name = self.name.split('.')[-1]
+
         for key, value in self.circuit_locals.items():
-            #values = [entry for entry in values if type(value) == type(entry)]
-            if key != 'self' and value not in values and hasattr(value, 'element') and value.element: 
+            if key != 'self' and hasattr(value, 'element') and value not in values and value.element:
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
                 values.append(value)
                 value.element.ref = name + '_' + key
@@ -99,7 +105,6 @@ class Base(Network(port='one')):
             self.output += self.element[2]
 
     # Consumption and Load
-
     def consumption(self, V):
         self.P = None
         self.I = None

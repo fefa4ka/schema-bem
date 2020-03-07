@@ -169,17 +169,12 @@ class Base(Physical()):
         return
 
     def circuit(self):
+        return super().circuit(value=self.value)
+
         # TODO: Wrong implementation
 
         if self.SIMULATION:
-            element = self.part_spice(value=self.value)
-            if element:
-                self.element = element
-
-                self.input += self.element[1]
-                self.output += self.element[2]
-
-            return
+            Builder = self.part_spice
         else:
             Builder = self.template
 
@@ -187,7 +182,7 @@ class Base(Physical()):
         values = self.values_optimal(self.value, error=15) #if not self.SIMULATION else [self.value]
         elements = []
         # print(f'{self.value} by {values}')
-        
+
         total_value = 0
         for index, value in enumerate(values):
             if type(value) == list:
@@ -215,13 +210,12 @@ class Base(Physical()):
             else:
                 value = u(value)
                 unit = self.value.clone()
-                unit._value = value 
+                unit._value = value
                 unit = unit.canonise()
                 r = Builder(value=unit)
                 total_value += value if self.increase else value / 2
 
                 self.element = r
-                self.element.ref = self.get_ref()
 
                 if index:
                     previous_r = elements[-1]
@@ -229,7 +223,7 @@ class Base(Physical()):
 
                 elements.append(r)
 
-        self.value = total_value
+        self.value._value = total_value
 
         self.input += elements[0][1]
         self.output += elements[-1][2]

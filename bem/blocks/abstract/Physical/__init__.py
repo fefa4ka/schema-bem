@@ -18,6 +18,7 @@ class Base(Electrical()):
     def __init__(self, *args, **kwargs):
         units = self.props.get('units', 1)
 
+        print(self.name, "INIT", units)
         params = {
             'A': kwargs
         }
@@ -71,6 +72,7 @@ class Base(Electrical()):
 
 
     def unitMount(self, unit, args, props, params):
+        print("UNIT MOUNT", unit, args, props, params)
         instance = self
         if unit != self.units[0]:
             instance = copy(self)
@@ -83,8 +85,8 @@ class Base(Electrical()):
         params['circuit'] = False
         if unit == self.units[0]:
             super().__init__(*args, **params)
-        else:
-            instance.__init__(*args, **params)
+        #else:
+            #instance.__init__(*args, **params)
 
         instance.part_aliases()
 
@@ -108,7 +110,7 @@ class Base(Electrical()):
         parts = Stockman(self).suitable_parts()
 
         if len(parts) == 0:
-            self.part_unavailable(self)
+            self.part_unavailable()
 
         return parts
 
@@ -127,7 +129,7 @@ class Base(Electrical()):
 
     def apply_part(self, part):
         if part == None:
-            self.part_unavailable(self)
+            self.part_unavailable()
 
         self.selected_part = part
 
@@ -183,6 +185,7 @@ class Base(Electrical()):
         part = self.part()
 
         # for unit in units.keys():
+        print("part ALIASES FOR unit", self.unit)
         for block_pin in units[self.unit].keys():
             for part_pin in units[self.unit][block_pin]:
                 pin_number = int(part_pin.split('/')[1])
@@ -191,6 +194,7 @@ class Base(Electrical()):
                 pin_net = Net(net_name)
                 pin_net += part[pin_number]
 
+                print(self, block_pin, pin_net)
                 setattr(self, block_pin, pin_net)
 
     def part_spice(self, *args, **kwargs):

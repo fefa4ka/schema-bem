@@ -50,10 +50,36 @@ class Block:
                         ref = key
                         break
 
+                code = inspect.getsourcelines(frame.f_code)[0]
+                code_line = frame.f_lineno - frame.f_code.co_firstlineno
+
                 self.context = {
                     'caller': frame_locals.get('self', None),
-                    'code': inspect.getsourcelines(frame.f_code)[0][frame.f_lineno - frame.f_code.co_firstlineno]
+                    'code': code[code_line]
                 }
+
+                parentheses_open_pos = self.context['code'].find('(')
+                parentheses_close_pos = self.context['code'].find(')')
+
+                # In code there aren't method call, lookup code for local variable
+                if parentheses_open_pos == -1 or (parentheses_open_pos > parentheses_close_pos):
+                    local_vars = frame.f_code.co_varnames[1:]
+                    code_part = [line.replace(' ', '') for line in code[0:code_line]]
+                    code_part.reverse()
+
+                    for line in code_part:
+                        parentheses_open_pos = line.find('(')
+                        parentheses_close_pos = line.find(')')
+                        for var in local_vars:
+                            if var + '=' in line:
+                                self.context['code'] = line
+                                break
+                        else:
+                            continue
+
+                        break
+                    else:
+                        self.context['code'] = ''
 
             deph += 1
 
@@ -256,6 +282,7 @@ class Block:
         assign_pos = code.find('=')
         and_pos = code.find('&')
         or_pos = code.find('|')
+        parentheses_pos = code.find('(')
         ref = code[:assign_pos].strip().replace('self', '')
         ref = re.sub("[\(\[].*?[\)\]]", "", ref)
         ref = re.sub('[(){}<>]', '', ref)
@@ -263,11 +290,16 @@ class Block:
         value = code[assign_pos:]
         ref = ''.join([word.capitalize() for word in ref.replace('_', '.').split('.')])
 
+        if assign_pos > parentheses_pos:
+            ref = name
+
         if assign_pos == -1 or code.find('return') != -1 or (and_pos != -1 and assign_pos > and_pos) or (or_pos != -1 and assign_pos > or_pos) or value == code:
             ref = name
 
         if self.context['caller'] and hasattr(self.context['caller'], 'name'):
-            ref = self.context['caller'].name.split('.')[-1] + '_' + ref
+            block_name = self.context['caller'].name.split('.')[-1]
+            if block_name not in ref:
+                ref = block_name + '_' + ref
 
         return ref
 
