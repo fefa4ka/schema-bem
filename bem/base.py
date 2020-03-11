@@ -92,10 +92,18 @@ class Block:
 
             deph += 1
 
-        args, defaults = self.get_default_arguments()
-        for prop in defaults.keys():
-            value = kwargs.get(prop, defaults[prop])
+        arguments = self.parse_arguments(kwargs)
+        for prop in arguments.keys():
+            value = arguments[prop]
             setattr(self, prop, value)
+
+        # Default V and Load from caller
+        caller = self.context['caller']
+        if not kwargs.get('V', False) and hasattr(caller, 'V'):
+            self.V = kwargs['V'] = caller.V
+
+        if not kwargs.get('Load', False) and hasattr(caller, 'Load'):
+            self.Load = kwargs['Load'] = caller.Load 
 
         self.mount(*args, **kwargs)
 
@@ -275,12 +283,11 @@ class Block:
         props = {}
         for attr in arguments:
             props[attr] = copy(defaults.get(attr, None)) #copy(getattr(cls, attr))
-            if type(props[attr]) == list:
-                props[attr] = props[attr][0]
             arg = args.get(attr, None)
             if arg:
                 if type(arg) == dict:
                     arg = arg.get('value', None)
+
                 if type(props[attr]) in [int, float]:
                     props[attr] = float(arg)
                 elif type(props[attr]) == str:

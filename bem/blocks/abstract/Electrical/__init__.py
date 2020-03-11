@@ -83,6 +83,7 @@ class Base(Network(port='one')):
             R_load -- Connected load presented in Ohms
             P_load -- Connected load presented in Watts
         """
+        print(self.name, 'Electrical V = '+ str(V) + ', Load = ' + str(Load))
         self.load(V)
 
     # Circuit Creation
@@ -127,6 +128,7 @@ class Base(Network(port='one')):
         self.R_load = None
         self.I_load = None
         self.P_load = None
+        self.V_load = V_load
         Load = self.Load
 
         if type(Load) in [int, float] or Load.is_same_unit(1 @ u_Ohm):
@@ -148,11 +150,6 @@ class Base(Network(port='one')):
 
         if not hasattr(self, 'Z_load'):
             self.Z_load = R(self.R_load)
-
-        self.load_args = {
-            'V': V_load,
-            'Load': self.Load
-        }
 
     def current(self, voltage, impedance):
         return voltage / impedance

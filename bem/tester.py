@@ -40,14 +40,14 @@ test_body_kit = [{
     },
     'args': {
         'V': {
-            'value': 12,
+            'value': 10,
             'unit': {
                 'name': 'volt',
                 'suffix': 'V'
             }
         },
         'frequency': {
-            'value': 60,
+            'value': 500000,
             'unit': {
                 'name': 'herz',
                 'suffix': 'Hz'
@@ -98,10 +98,8 @@ class Test:
                 mods = body_kit['mods']
 
             ref = body_kit['name'].split('.')[-1] + '_' + str(index)
-            print("\nBody Kit Create")
             LoadBlock = Build(body_kit['name'], **mods, ref=ref).block
             args = LoadBlock.parse_arguments(body_kit['args'])
-            print(args, index, body_kit)
             Load = LoadBlock(**args)
 
             for body_kit_pin in body_kit['pins'].keys():
