@@ -9,6 +9,7 @@ from skidl import Net
 from bem import Block, u
 from bem.abstract import Physical
 from bem.model import Param
+from copy import copy
 
 si_units = inspect.getmembers(SiUnits, lambda a: not (inspect.isroutine(a)))
 prefixes = {prefix[1].__prefix__: prefix[1].__power__ for prefix in si_units if hasattr(prefix[1], '__prefix__')}
@@ -18,10 +19,11 @@ prefixes['0'] = 0
 
 class Base(Physical()):
     increase = True
-    value = 0
 
     def __init__(self, *args, **kwargs):
-        value = self.value
+        arguments, defaults = self.get_default_arguments()
+
+        default_value = value = defaults.get('value', None)
 
         if len(args) > 0 and 'value' not in kwargs.keys():
             value = args[0]
@@ -32,8 +34,9 @@ class Base(Physical()):
 
         if type(value) in [UnitValue, PeriodValue, FrequencyValue]:
             kwargs['value'] = value
-        elif type(self.value) in [UnitValue, PeriodValue, FrequencyValue]:
-            self.value._value = float(value)
+        elif type(default_value) in [UnitValue, PeriodValue, FrequencyValue]:
+            self.value = copy(default_value)
+            self.value._value = u(value)
             kwargs['value'] = self.value
         else:
             kwargs['value'] = value

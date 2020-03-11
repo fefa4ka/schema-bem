@@ -10,15 +10,9 @@ import sys
 
 
 class Base(Electrical()):
-    model = ''
-
-    template = None
-    units = 1
-
     def __init__(self, *args, **kwargs):
         units = self.props.get('units', 1)
 
-        print(self.name, "INIT", units)
         params = {
             'A': kwargs
         }
@@ -72,7 +66,6 @@ class Base(Electrical()):
 
 
     def unitMount(self, unit, args, props, params):
-        print("UNIT MOUNT", unit, args, props, params)
         instance = self
         if unit != self.units[0]:
             instance = copy(self)
@@ -94,7 +87,7 @@ class Base(Electrical()):
 
         return instance
 
-    def willMount(self, model=None):
+    def willMount(self, model=''):
         part = self.props.get('part', None)
 
         if part:
@@ -185,7 +178,6 @@ class Base(Electrical()):
         part = self.part()
 
         # for unit in units.keys():
-        print("part ALIASES FOR unit", self.unit)
         for block_pin in units[self.unit].keys():
             for part_pin in units[self.unit][block_pin]:
                 pin_number = int(part_pin.split('/')[1])
@@ -194,7 +186,6 @@ class Base(Electrical()):
                 pin_net = Net(net_name)
                 pin_net += part[pin_number]
 
-                print(self, block_pin, pin_net)
                 setattr(self, block_pin, pin_net)
 
     def part_spice(self, *args, **kwargs):

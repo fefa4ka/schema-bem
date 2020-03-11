@@ -19,31 +19,21 @@ class Base(Combination()):
     """
     increase = True
 
-    value = 1000 @ u_Ohm
-    G = 0 @ u_S
-    V_drop = 0 @ u_V
-
-    def willMount(self):
+    def willMount(self, value=1000 @ u_Ohm, V=12 @ u_V):
         """
             value -- A resistor is made out of some conducting stuff (carbon, or a thin metal or carbon film, or wire of poor conductivity), with a wire or contacts at each end. It is characterized by its resistance.
             V_drop -- Voltage drop after resistor with Load
         """
 
         self.Power = self.value
+        self.consumption(self.V)
 
         # Power Dissipation
-        if self.Load.is_same_unit(1 @ u_Ohm):
-            I_total = self.current(self.V, self.Load + self.value)
-        elif self.Load.is_same_unit(1 @ u_A):
-            I_total = self.I + self.Load
-        elif self.Load.is_same_unit(1 @ u_W):
-            I_total = (self.P + self.Load) / self.V
+        I_total = self.current(self.V, self.R_load + self.value)
 
         self.V_drop = self.value * I_total
 
         self.load(self.V - self.V_drop)
-        self.consumption(self.V)
-
 
     def network(self):
         return R(self.value)

@@ -1,7 +1,7 @@
 from bem import Build
 from bem.abstract import Combination
 from skidl import Part, TEMPLATE
-from PySpice.Unit import u_F, u_V, u_C, u_J
+from PySpice.Unit import u_F, u_V, u_C, u_J, u_F
 import numpy as np
 
 class Base(Combination()):
@@ -10,7 +10,7 @@ class Base(Combination()):
        `Q = CV` (1)
 
         A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other. 
-        
+
         Taking the derivative of the defining equation 1, you get
         `I = C (dV)/(dt)`
 
@@ -20,13 +20,10 @@ class Base(Combination()):
 
         * Paul Horowitz and Winfield Hill. "1.4.1 Capacitors" The Art of Electronics – 3rd Edition. Cambridge University Press, 2015, pp. 51-52
     """
-    
-    increase = False
-    value = 0.0000001 @ u_F
-    Q = 0 @ u_C
-    U_C = 0 @ u_J
 
-    def willMount(self):
+    increase = False
+
+    def willMount(self, value = 1 @ u_F):
         """
             value -- The capacitance is proportional to the area and inversely proportional to the spacing. For the simple parallel-plate capacitor, with separation `d` and plate area `A` (and with the spacing `d` much less than the dimensions of the plates), the capacitance `C` is given by `C = 8.85 xx 10^-14 (εA)/d F` where `ε` is the [dielectric constant](https://en.wikipedia.org/wiki/Relative_permittivity) of the insulator, and the dimensions are measured in centimeters.
             Q -- A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other. 
@@ -34,7 +31,6 @@ class Base(Combination()):
         """
 
         #self.value = self.value_closest(self.value) if not self.SIMULATION else self.value
-
         self.consumption(0)
 
         self.Q = self.value * self.V

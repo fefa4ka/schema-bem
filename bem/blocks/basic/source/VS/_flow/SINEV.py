@@ -5,14 +5,7 @@ from sympy import Integer, Float
 from numpy import linspace
 
 class Modificator(Base):
-    amplitude = 0 @ u_V
-    frequency = 1 @ u_Hz
-    dc_offset = 0 @ u_V
-    offset = 0 @ u_V
-    delay = 0 @ u_s
-    damping_factor = 0
-
-    def willMount(self, frequency, dc_offset=0@ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
+    def willMount(self, frequency=1 @ u_Hz, dc_offset=0@ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
         self.amplitude = self.V
 
     def get_spice_arguments(self):

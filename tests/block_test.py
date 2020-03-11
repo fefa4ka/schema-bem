@@ -204,3 +204,4 @@ test_bem_inherited_build()
 test_bem_modificator()
 test_network()
 test_resistor(180)
+

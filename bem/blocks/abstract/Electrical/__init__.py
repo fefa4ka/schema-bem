@@ -1,6 +1,5 @@
 from bem import u
 from bem.abstract import Network
-from bem.tester import BuildTest
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
 import sys
@@ -8,13 +7,6 @@ import sys
 tracer_instances = [None]
 
 class Base(Network(port='one')):
-    V = 10 @ u_V
-    Power = 0 @ u_W
-    Load = 1000 @ u_Ohm  # [0 @ u_Ohm, 0 @ u_A, 0 @ u_W]
-    I_load = 1 @ u_A
-    R_load = 1 @ u_Ohm
-    P_load = 1 @ u_W
-
     doc_methods = ['willMount', 'circuit']
 
     element = None
@@ -27,15 +19,13 @@ class Base(Network(port='one')):
         if kwargs.get('circuit', None) != None:
             del kwargs['circuit']
 
-        self.load(self.V)
-
         super().__init__(*args, **kwargs)
-
-        if self.Power and not hasattr(self, 'P'):
-            self.consumption(self.V)
 
         if is_ciruit_building:
             self.release()
+
+        if hasattr(self, 'Power') and not hasattr(self, 'P'):
+            self.consumption(self.V)
 
     def release(self):
         self.circuit_locals = {}
@@ -81,7 +71,7 @@ class Base(Network(port='one')):
                 for pin in net.get_pins():
                     pin.notes += pad_name + ':' + str(self)
 
-    def willMount(self, V=None, Load=None):
+    def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
         """
             V -- Volts across its input terminal and gnd
             V_out -- Volts across its output terminal and gnd
@@ -93,7 +83,7 @@ class Base(Network(port='one')):
             R_load -- Connected load presented in Ohms
             P_load -- Connected load presented in Watts
         """
-        pass
+        self.load(V)
 
     # Circuit Creation
     def circuit(self, *args, **kwargs):
@@ -110,10 +100,10 @@ class Base(Network(port='one')):
         self.I = None
         self.Z = None
 
-        if self.Power == 0 @ u_Ohm or V == 0:
+        if not hasattr(self, 'Power') or self.Power == 0 @ u_Ohm or V == 0:
             return
 
-        Power = self.Power
+        Power = self.Power 
 
         if Power.is_same_unit(1 @ u_Ohm):
             self.Z = Power
@@ -175,17 +165,4 @@ class Base(Network(port='one')):
 
     def part_spice(self, *args, **kwargs):
         return None
-
-    def simulate(self, body_kit):
-        Test = BuildTest(self.__class__, **(self.mods))
-
-        def method_body_kit():
-            return body_kit
-
-        Test.body_kit = method_body_kit
-
-        arguments = self.get_arguments()
-        simulation = Test.simulate(arguments)
-
-        return simulation
 

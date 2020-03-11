@@ -4,10 +4,9 @@ class Base(Block):
     """
         Basic block. It accept argument 'some_arg' and have parameter 'some_param'.
     """
-    some_arg = 0
     some_param = 31337
 
-    def willMount(self, some_arg):
+    def willMount(self, some_arg=0):
         """
             some_param -- param description parsed by BEM Block
         """

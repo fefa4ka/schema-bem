@@ -4,13 +4,7 @@ from lcapy import Vdc
 from sympy import Float
 
 class Modificator(Base):
-    initial_value = 0 @ u_V
-    pulsed_value = 0 @ u_V
-    pulse_width = 0 @ u_s
-    period = 0 @ u_s
-    delay_time = 0 @ u_s
-
-    def willMount(self, initial_value, pulse_width, period, delay_time):
+    def willMount(self, initial_value=0 @ u_V, pulse_width=0 @ u_s, period=0 @ u_s, delay_time=0 @ u_s):
         self.pulsed_value = self.V
 
     def get_spice_arguments(self):

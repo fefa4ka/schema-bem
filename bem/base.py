@@ -50,7 +50,16 @@ class Block:
                         ref = key
                         break
 
-                code = inspect.getsourcelines(frame.f_code)[0]
+                try:
+                    code = inspect.getsourcelines(frame.f_code)[0]
+                except OSError:
+                    # If code runned from shell
+                    self.context = {
+                        'caller': None,
+                        'code': ''
+                    }
+                    break
+
                 code_line = frame.f_lineno - frame.f_code.co_firstlineno
 
                 self.context = {
@@ -83,9 +92,10 @@ class Block:
 
             deph += 1
 
-        for prop in kwargs.keys():
-            if hasattr(self, prop):
-                setattr(self, prop, kwargs[prop])
+        args, defaults = self.get_default_arguments()
+        for prop in defaults.keys():
+            value = kwargs.get(prop, defaults[prop])
+            setattr(self, prop, value)
 
         self.mount(*args, **kwargs)
 
@@ -183,9 +193,9 @@ class Block:
 
 
     # Virtual Part
-    def get_arguments(self):
-        arguments = {}
+    def get_default_arguments(self):
         args = []
+        defaults = {}
 
         classes = []
         try:
@@ -199,12 +209,25 @@ class Block:
         for cls in classes:
             if hasattr(cls, 'willMount'):
                 args += inspect.getargspec(cls.willMount).args
+                signature = inspect.signature(cls.willMount)
+                defaults = { **defaults,
+                         **{
+                            k: v.default
+                            for k, v in signature.parameters.items()
+                            if v.default is not inspect.Parameter.empty
+                        }
+                }
+
+        args = list(set([arg for arg in args if arg != 'self']))
+
+        return args, defaults
+
+    def get_arguments(self):
+        arguments = {}
+        args, defaults = self.get_default_arguments()
 
         for arg in args:
-            if arg in ['self']:
-                continue
-
-            default = getattr(self, arg)
+            default = getattr(self, arg) if hasattr(self, arg) else defaults.get(arg, None)
             if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
                 arguments[arg] = {
                     'value': default.value * default.scale,
@@ -248,10 +271,10 @@ class Block:
 
     @classmethod
     def parse_arguments(cls, args):
-        arguments = cls.get_arguments(cls)
+        arguments, defaults = cls.get_default_arguments(cls)
         props = {}
         for attr in arguments:
-            props[attr] = copy(getattr(cls, attr))
+            props[attr] = copy(defaults.get(attr, None)) #copy(getattr(cls, attr))
             if type(props[attr]) == list:
                 props[attr] = props[attr][0]
             arg = args.get(attr, None)
@@ -276,7 +299,8 @@ class Block:
         """
         Ref extracted from code variable name
         """
-        name = self.name.split('.')[-1]
+        name = self.ref if hasattr(self, 'ref') else self.name
+        name = name.split('.')[-1]
         code = self.context['code']
 
         assign_pos = code.find('=')
@@ -297,7 +321,7 @@ class Block:
             ref = name
 
         if self.context['caller'] and hasattr(self.context['caller'], 'name'):
-            block_name = self.context['caller'].name.split('.')[-1]
+            block_name = self.context['caller'].ref.split('.')[-1]
             if block_name not in ref:
                 ref = block_name + '_' + ref
 
