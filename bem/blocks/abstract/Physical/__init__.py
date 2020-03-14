@@ -45,6 +45,7 @@ class Base(Electrical()):
 
             instance = self.unitMount(unit, args, unit_props, unit_params)
 
+            # After first unit mount we know available units in part
             if len(instance.units) > len(units_requested):
                 units_requested = instance.units
                 unit_queue = list(set(unit_queue + instance.units))
@@ -63,7 +64,6 @@ class Base(Electrical()):
                         return params[0]
 
         return super().__getitem__(*attrs_or_pins, **criteria)
-
 
     def unitMount(self, unit, args, props, params):
         instance = self
@@ -97,7 +97,6 @@ class Base(Electrical()):
         if not hasattr(self.parent, 'selected_part'):
             selected_part = self.parent.select_part()
             self.parent.apply_part(selected_part)
-
 
     def available_parts(self):
         parts = Stockman(self).suitable_parts()

@@ -10,12 +10,6 @@ class Modificator(Base):
         'gnd': True
     }
 
-    input = None
-    input_n = None
-
-    output = None
-    output_n = None
-
     def __series__(self, instance):
         if self.output and instance.input:
             self.output._name = instance.input._name = f'{self.name}{instance.name}_Net'

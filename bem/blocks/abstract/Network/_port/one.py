@@ -8,9 +8,6 @@ class Modificator(Base):
         'gnd': True
     }
 
-    input = None
-    output = None
-
     # Link Routines
     def __series__(self, instance):
         if self.output and instance.input:
@@ -27,6 +24,7 @@ class Modificator(Base):
         self.connect_power_bus(instance)
 
 
+    # TODO: Experimental
     def Z_in(self):
         Z = self.network().Z
 
@@ -51,7 +49,8 @@ class Modificator(Base):
         return (self.input.signal + self.Z).norton()
 
     def transfer(self):
-        if hasattr(self.input, 'signal') and hasattr(self.output, 'signal'):
-            return self.output.signal.V.laplace() / self.input.signal.V.laplace()
+        if hasattr(self, 'input') and hasattr(self, 'output'):
+            if hasattr(self.input, 'signal') and hasattr(self.output, 'signal'):
+                return self.output.signal.V.laplace() / self.input.signal.V.laplace()
 
         return super().transfer()

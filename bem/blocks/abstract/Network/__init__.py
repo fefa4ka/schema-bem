@@ -41,7 +41,6 @@ class Base(Block):
 
     def __and__(self, instance):
         if issubclass(type(instance), Block):
-            # print(f'{self.title} series connect {instance.title if hasattr(instance, "title") else instance.name}')
             self.__series__(instance)
 
             return instance
@@ -61,9 +60,29 @@ class Base(Block):
 
         raise Exception
 
+    """
+    TODO: += connect __setitem__
+    def __setitem__(self, ids, *pins_nets_buses):
+        # If the iadd_flag is set, then it's OK that we got
+        # here and don't issue an error. Also, delete the flag.
+        if getattr(self, "iadd_flag", False):
+            del self.iadd_flag
+            return
+
+    def connect(self, *blocks_pins_nets):
+        from skidl.utilities import flatten
+        for pin in flatten(blocks_pins_nets):
+            self & pin
+
+        # Set the flag to indicate this result came from the += operator.
+        self.iadd_flag = True
+
+        return self
+    __iadd__ = connect
+    """
+
     def __rand__(self, instance):
         if issubclass(type(instance), Block):
-            # print(f'{self.title} series connect {instance.title if hasattr(instance, "title") else instance.name}')
             instance.__series__(self)
 
             return self
@@ -134,7 +153,7 @@ class Base(Block):
 
             # pin = True, str -- Net(pin_name | str)
             # pin = Int -- Bus(pin_name, Int)
-            original_net = getattr(self, pin) if hasattr(self, pin) else None
+            original_net = getattr(self, pin, None)
             if type(pin_description) in [list, tuple]:
                 for pin_data in pin_description:
                     if type(pin_data) == str:
@@ -157,6 +176,7 @@ class Base(Block):
             for net in related_nets:
                 setattr(self, net, original_net)
 
+    # TODO: Experimental
     def transfer(self):
         if hasattr(self, 'network'):
             network = self.network()

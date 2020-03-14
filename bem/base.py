@@ -71,14 +71,22 @@ class Block:
                 parentheses_close_pos = self.context['code'].find(')')
 
                 # In code there aren't method call, lookup code for local variable
+                code_part = [line.replace(' ', '') for line in code[0:code_line]]
+                code_part.reverse()
+
                 if parentheses_open_pos == -1 or (parentheses_open_pos > parentheses_close_pos):
                     local_vars = frame.f_code.co_varnames[1:]
-                    code_part = [line.replace(' ', '') for line in code[0:code_line]]
-                    code_part.reverse()
 
                     for line in code_part:
                         parentheses_open_pos = line.find('(')
                         parentheses_close_pos = line.find(')')
+
+                        # Block constructed from local method
+                        if line.find('return') == 0:
+                            ref = None
+                            break
+
+                        # Block assigned as local variable
                         for var in local_vars:
                             if var + '=' in line:
                                 self.context['code'] = line
@@ -89,6 +97,11 @@ class Block:
                         break
                     else:
                         self.context['code'] = ''
+                elif self.context['code'].find('=') == -1 or self.context['code'].find('return') != -1:
+                    for line in code_part:
+                        if line.find('def') == 0:
+                            self.context['code'] = line[3:line.find('(')] + '=()'
+                            break
 
             deph += 1
 
@@ -103,9 +116,17 @@ class Block:
             self.V = kwargs['V'] = caller.V
 
         if not kwargs.get('Load', False) and hasattr(caller, 'Load'):
-            self.Load = kwargs['Load'] = caller.Load 
+            self.Load = kwargs['Load'] = caller.Load
 
         self.mount(*args, **kwargs)
+
+        for arg in arguments.keys():
+            if hasattr(self, arg) and isinstance(getattr(self, arg), FunctionType):
+                value = getattr(self, arg)(self)
+                setattr(self, arg, value)
+            elif isinstance(kwargs.get(arg, None), FunctionType):
+                value = kwargs[arg](self)
+                setattr(self, arg, value)
 
     def mount(self, *args, **kwargs):
         # Last class is object
@@ -120,14 +141,6 @@ class Block:
                 mount_kwargs = kwargs.copy()
                 if len(mount_args_keys) == 1:
                     args = []
-
-                for arg in mount_args_keys:
-                    if hasattr(self, arg) and isinstance(getattr(self, arg), FunctionType):
-                        value = getattr(self, arg)(self)
-                        setattr(self, arg, value)
-                        mount_kwargs[arg] = value
-                    elif isinstance(kwargs.get(arg, None), FunctionType):
-                        mount_kwargs[arg] = kwargs[arg](self)
 
                 mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
                 cls.willMount(self, *args, **mount_args)
@@ -222,7 +235,6 @@ class Block:
                          **{
                             k: v.default
                             for k, v in signature.parameters.items()
-                            if v.default is not inspect.Parameter.empty
                         }
                 }
 
@@ -290,14 +302,18 @@ class Block:
 
                 if type(props[attr]) in [int, float]:
                     props[attr] = float(arg)
-                elif type(props[attr]) == str:
-                    props[attr] = arg
-                elif type(props[attr]) == list:
-                    props[attr] = props[attr][0]
-                elif isinstance(arg, Block):
-                    props[attr] = arg
-                elif not type(props[attr]) == type(None):
+                #elif type(props[attr]) in [str, bool]:
+                #    props[attr] = arg
+                # elif type(props[attr]) == list:
+                #    props[attr] = props[attr][0]
+                # elif isinstance(arg, Block):
+                #     props[attr] = arg
+                # elif isinstance(arg, FunctionType):
+                #     props[attr] = arg
+                elif type(props[attr]) in [UnitValue, PeriodValue, FrequencyValue]:
                     props[attr]._value = float(arg)
+                else:
+                    props[attr] = arg
 
         return props
 
@@ -306,7 +322,7 @@ class Block:
         """
         Ref extracted from code variable name
         """
-        name = self.ref if hasattr(self, 'ref') else self.name
+        name = self.ref if hasattr(self, 'ref') and self.ref else self.name
         name = name.split('.')[-1]
         code = self.context['code']
 

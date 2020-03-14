@@ -83,7 +83,6 @@ class Base(Network(port='one')):
             R_load -- Connected load presented in Ohms
             P_load -- Connected load presented in Watts
         """
-        print(self.name, 'Electrical V = '+ str(V) + ', Load = ' + str(Load))
         self.load(V)
 
     # Circuit Creation
