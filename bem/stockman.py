@@ -29,9 +29,10 @@ class Stockman:
         name = self.block.name
         parts = Part.select().where(Part.block == name)
 
+
         return parts
 
-    def suitable_parts(self):
+    def suitable_parts(self, parts=[]):
         """Available parts in stock
             from Part model
             filtered by Block modifications and params and spice model.
@@ -41,9 +42,11 @@ class Stockman:
         """
         available = []
 
-        parts = self.related_parts()
-
         for part in parts:
+            if self.is_part_proper(part):
+                available.append(part)
+
+        for part in self.related_parts():
             if self.is_part_proper(part):
                 available.append(part)
 

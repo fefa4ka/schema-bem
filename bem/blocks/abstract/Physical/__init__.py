@@ -7,50 +7,9 @@ from copy import copy
 import string
 from bem.model import Param
 import sys
-
+import builtins
 
 class Base(Electrical()):
-    def __init__(self, *args, **kwargs):
-        units = self.props.get('units', 1)
-
-        params = {
-            'A': kwargs
-        }
-
-        props = {
-            'A': self.props
-        }
-
-        if len(args) == 1 and type(args[0]) == dict:
-            params = args[0]
-            args = ()
-
-        if type(units) == int:
-            self.units = list(string.ascii_uppercase)[:units]
-
-        if type(units) == dict:
-            keys = units.keys()
-            self.units = list(keys)
-            props = units
-        else:
-            props = { unit: props['A'] for unit in self.units }
-
-        units_requested = self.units
-        unit_queue = copy(self.units)
-        unit_queue.reverse()
-        while unit_queue:
-            unit = unit_queue.pop()
-            unit_props = props.get(unit, None) or props[self.units[0]]
-            unit_params = params.get(unit, None) or params[self.units[0]]
-
-            instance = self.unitMount(unit, args, unit_props, unit_params)
-
-            # After first unit mount we know available units in part
-            if len(instance.units) > len(units_requested):
-                units_requested = instance.units
-                unit_queue = list(set(unit_queue + instance.units))
-                unit_queue.remove(unit)
-
     def __getitem__(self, *attrs_or_pins, **criteria):
         if hasattr(self, 'selected_part') and len(attrs_or_pins) == 1:
             attr = attrs_or_pins[0]
@@ -65,28 +24,6 @@ class Base(Electrical()):
 
         return super().__getitem__(*attrs_or_pins, **criteria)
 
-    def unitMount(self, unit, args, props, params):
-        instance = self
-        if unit != self.units[0]:
-            instance = copy(self)
-
-        setattr(self, unit, instance)
-        setattr(instance, 'parent', self)
-        setattr(instance, 'props', props)
-        setattr(instance, 'unit', unit)
-
-        params['circuit'] = False
-        if unit == self.units[0]:
-            super().__init__(*args, **params)
-        #else:
-            #instance.__init__(*args, **params)
-
-        instance.part_aliases()
-
-        instance.release()
-
-        return instance
-
     def willMount(self, model=''):
         part = self.props.get('part', None)
 
@@ -94,12 +31,14 @@ class Base(Electrical()):
             self.selected_part = part
             self.template = self.part_template()
 
-        if not hasattr(self.parent, 'selected_part'):
-            selected_part = self.parent.select_part()
-            self.parent.apply_part(selected_part)
+        if not hasattr(self, 'selected_part'):
+            selected_part = self.select_part()
+            self.apply_part(selected_part)
+
+        self.part_aliases()
 
     def available_parts(self):
-        parts = Stockman(self).suitable_parts()
+        parts = Stockman(self).suitable_parts(builtins.default_circuit.units[self.name])
 
         if len(parts) == 0:
             self.part_unavailable()
@@ -107,7 +46,9 @@ class Base(Electrical()):
         return parts
 
     def select_part(self):
+        # Select allready placed parts in circuit with unused units
         available = list(self.available_parts())
+
         model = self.model
 
         if model:
@@ -115,6 +56,7 @@ class Base(Electrical()):
                 if part.model == model:
                     return part
 
+        # TODO: Logic if no part with certain model. Why not raise lookup error? 
         part = available[0] if len(available) > 0 else None
 
         return part
@@ -137,12 +79,20 @@ class Base(Electrical()):
         for pin in self.selected_part.pins:
             units[pin.unit][pin.block_pin].append(pin.pin)
 
-        self.units = list(units.keys())
+        if hasattr(part, 'instance'):
+            self.part = part.instance.part
+            self.unit = part.unit
 
-            # if stock.params
-            # if self.units > 1 and type(units) == dict:
-            #     for unit in units.keys():
+            builtins.default_circuit.units[self.name].remove(part)
 
+        if len(units.keys()) > 1 and not hasattr(part, 'instance'):
+            self.unit = 'A'
+            part.instance = self
+            del units['A']
+            for free_unit in units.keys():
+                free_unit_part = copy(part)
+                free_unit_part.unit = free_unit
+                builtins.default_circuit.units[self.name].append(free_unit_part)
 
     # Physical or Spice Part
     def part_template(self):
@@ -176,7 +126,6 @@ class Base(Electrical()):
 
         part = self.part()
 
-        # for unit in units.keys():
         for block_pin in units[self.unit].keys():
             for part_pin in units[self.unit][block_pin]:
                 pin_number = int(part_pin.split('/')[1])
@@ -194,7 +143,7 @@ class Base(Electrical()):
 
     def part(self, *args, **kwargs):
         # Only one instance of Part could be used in Block
-        if not hasattr(self.parent, '_part') or self.parent._part == None:
+        if not hasattr(self, '_part') or self._part == None:
             tracer = sys.getprofile()
             sys.setprofile(None)
             if self.SIMULATION:
@@ -208,10 +157,10 @@ class Base(Electrical()):
                 part.set_pin_alias('n', 2)
                 part.set_pin_alias('-', 2)
 
-            self.parent._part = part
+            self._part = part
             sys.setprofile(tracer)
 
-        part = self.parent._part
+        part = self._part
         part.ref = self.ref or self.get_ref()
 
         return part

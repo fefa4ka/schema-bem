@@ -53,7 +53,19 @@ class Simulate:
         self.block = block
 
         from skidl.tools.spice import node
-        self.circuit = builtins.default_circuit.generate_netlist(libs=libs)
+        circuit = builtins.default_circuit
+
+        # Connect unused units to NC network
+        # Needed for correct SPICE simulation 
+        units = circuit.units
+        for unit in units:
+            for block in units[unit]:
+                part = block.instance.part()
+                for pin in part.get_pins():
+                    if len(pin.get_nets()) == 0:
+                        pin & circuit.NC
+
+        self.circuit = circuit.generate_netlist(libs=libs)
 
         # Grab ERC from logger 
         erc = logging.getLogger('ERC_Logger')
@@ -159,7 +171,9 @@ def set_spice_enviroment():
     builtins.SIMULATION = True
 
     scheme = Circuit()
+    scheme.units = collections.defaultdict(list)
     builtins.default_circuit.reset(init=True)
     del builtins.default_circuit
     builtins.default_circuit = scheme
+    scheme.NC = Net('NC')
     builtins.NC = scheme.NC

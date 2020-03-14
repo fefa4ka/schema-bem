@@ -172,7 +172,9 @@ class Base(Physical()):
         return
 
     def circuit(self):
-        return super().circuit(value=self.value.canonise())
+        value = self.value.canonise()
+        value._value = round(value._value)
+        return super().circuit(value=value)
 
         # TODO: Wrong implementation
 

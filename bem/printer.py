@@ -2,6 +2,7 @@ from bem import Block, Build
 from skidl import Circuit, set_default_tool, KICAD, set_backup_lib
 from bem.abstract import Physical
 import builtins
+from collections import defaultdict
 
 class Print:
     block = None
@@ -14,6 +15,7 @@ class Print:
         builtins.SIMULATION = False
 
         self.scheme = Circuit()
+        self.scheme.units = defaultdict(list)
         builtins.default_circuit.reset(init=True)
         del builtins.default_circuit
         builtins.default_circuit = self.scheme

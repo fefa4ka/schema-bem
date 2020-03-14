@@ -43,6 +43,9 @@ class Part(BaseModel):
     stock = ManyToManyField(Stock, backref='parts_stock')
     pins = ManyToManyField(Pin, backref='blocks')
 
+    def __str__(self):
+        return ' '.join([str(self.id), self.block, self.model])
+
     @property
     def spice_params(self):
         if self.spice.upper().find('SUBCKT') != -1:
