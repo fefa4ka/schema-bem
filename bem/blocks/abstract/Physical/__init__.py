@@ -79,6 +79,7 @@ class Base(Electrical()):
         for pin in self.selected_part.pins:
             units[pin.unit][pin.block_pin].append(pin.pin)
 
+        self.unit = 'A'
         if hasattr(part, 'instance'):
             self.part = part.instance.part
             self.unit = part.unit
@@ -86,7 +87,6 @@ class Base(Electrical()):
             builtins.default_circuit.units[self.name].remove(part)
 
         if len(units.keys()) > 1 and not hasattr(part, 'instance'):
-            self.unit = 'A'
             part.instance = self
             del units['A']
             for free_unit in units.keys():

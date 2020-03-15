@@ -126,6 +126,9 @@ class Base(Block):
         if self.v_ref and instance.v_ref:
             self.v_ref += instance.v_ref
 
+        if hasattr(self, 'v_inv') and hasattr(instance, 'v_inv'):
+            self.v_inv += instance.v_inv
+
 
     # Pins
     def get_pins(self):

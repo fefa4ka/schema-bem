@@ -214,17 +214,18 @@ class Block:
 
 
     # Virtual Part
-    def get_default_arguments(self):
+    @classmethod
+    def get_default_arguments(cls):
         args = []
         defaults = {}
 
         classes = []
         try:
-            classes += list(inspect.getmro(self))
+            classes += list(inspect.getmro(cls))
         except:
             pass
 
-        classes += list(inspect.getmro(self.__class__))
+        classes += list(inspect.getmro(cls.__class__))
 
         classes.reverse()
         for cls in classes:
@@ -291,7 +292,7 @@ class Block:
 
     @classmethod
     def parse_arguments(cls, args):
-        arguments, defaults = cls.get_default_arguments(cls)
+        arguments, defaults = cls.get_default_arguments()
         props = {}
         for attr in arguments:
             props[attr] = copy(defaults.get(attr, None)) #copy(getattr(cls, attr))
@@ -311,7 +312,10 @@ class Block:
                 # elif isinstance(arg, FunctionType):
                 #     props[attr] = arg
                 elif type(props[attr]) in [UnitValue, PeriodValue, FrequencyValue]:
-                    props[attr]._value = float(arg)
+                    if type(arg) in [UnitValue, PeriodValue, FrequencyValue]:
+                        props[attr] = arg
+                    else:
+                        props[attr]._value = float(arg)
                 else:
                     props[attr] = arg
 
