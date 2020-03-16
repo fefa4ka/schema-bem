@@ -123,7 +123,7 @@ class Test:
 
         if not (end_time and step_time):
             period = get_minimum_period(self.body_kit())
-            end_time = period * 4
+            end_time = period * 8
             step_time = period / 50
 
         simulation = Simulate(self.block)
@@ -181,8 +181,7 @@ def BuildTest(Block, *args, **kwargs):
 
         if len(tests):
             Tests = tests
-            # Tests.reverse()
-            Tests = tuple(set(tests))
+            Tests = tuple(Tests)
         else:
             Tests = (Test,)
 

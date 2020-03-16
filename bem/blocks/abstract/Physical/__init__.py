@@ -31,14 +31,17 @@ class Base(Electrical()):
             self.selected_part = part
             self.template = self.part_template()
 
+    def mount(self, *args, **kwargs):
+        super().mount(*args, **kwargs)
+
         if not hasattr(self, 'selected_part'):
             selected_part = self.select_part()
             self.apply_part(selected_part)
 
-        self.part_aliases()
-
     def available_parts(self):
-        parts = Stockman(self).suitable_parts(builtins.default_circuit.units[self.name])
+        circuit = builtins.default_circuit
+        circuits_units = circuit.units[self.name] if hasattr(circuit, 'units') else []
+        parts = Stockman(self).suitable_parts(circuits_units)
 
         if len(parts) == 0:
             self.part_unavailable()
@@ -93,6 +96,8 @@ class Base(Electrical()):
                 free_unit_part = copy(part)
                 free_unit_part.unit = free_unit
                 builtins.default_circuit.units[self.name].append(free_unit_part)
+
+        self.part_aliases()
 
     # Physical or Spice Part
     def part_template(self):

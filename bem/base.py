@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class Block:
-    name = ''
     mods = {}
     props = {}
 
@@ -300,7 +299,6 @@ class Block:
             if arg:
                 if type(arg) == dict:
                     arg = arg.get('value', None)
-
                 if type(props[attr]) in [int, float]:
                     props[attr] = float(arg)
                 #elif type(props[attr]) in [str, bool]:
@@ -357,6 +355,12 @@ class Block:
 
     def get_params(self):
         params_default = inspect.getmembers(self, lambda a: not (inspect.isroutine(a)))
+
+        # from PySpice.Unit import u_W, u_A, u_Ohm
+        # params = [('units', ''),
+        #           ('P', 1 @ u_W), ('I', 1 @ u_A), ('Z', 1 @ u_Ohm)]
+
+        # params_default += params 
 
         params = {}
         for param, default in params_default:

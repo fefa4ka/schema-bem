@@ -3,6 +3,7 @@ from bem.abstract import Combination
 from skidl import Part, TEMPLATE
 from PySpice.Unit import u_F, u_V, u_C, u_J, u_F
 import numpy as np
+from lcapy import C
 
 class Base(Combination()):
     """
@@ -35,6 +36,10 @@ class Base(Combination()):
 
         self.Q = self.value * self.V
         self.U_C = self.energy(self.V)
+
+    # Lcapy
+    def network(self):
+        return C(self.value)
 
     def energy(self, voltage):
         return self.value * voltage * voltage / 2

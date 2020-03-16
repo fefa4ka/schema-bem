@@ -103,13 +103,7 @@ class Base(Physical()):
             else:
                 suited_parts = available_parts
 
-        filtered_parts = []
-        if self.model:
-            for part in suited_parts:
-                if part.model == self.model:
-                    filtered_parts.append(part)
-
-        return filtered_parts if len(filtered_parts) > 0 else suited_parts
+        return suited_parts
 
     def values_optimal(self, desire, error=10, error_threshold=0):
         # TODO: make better
@@ -172,7 +166,9 @@ class Base(Physical()):
         return
 
     def circuit(self):
-        value = self.value.canonise()
+        # Closest
+        value = self.value_closest(self.value)
+        value = value.canonise()
         value._value = round(value._value)
         return super().circuit(value=value)
 

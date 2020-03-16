@@ -3,8 +3,6 @@ from .model import Param, Mod, Prop
 from .util import u, is_tolerated
 
 class Stockman:
-    upper_limit = []
-
     def __init__(self, block):
         self.block = block
 
@@ -12,10 +10,10 @@ class Stockman:
     def request(self):
         block = self.block
         load = {
-             'V': getattr(block, 'V', None),
-             'P_load': block.P_load,
-             'I_load': block.I_load,
-             'R_load': block.R_load
+             'V': block.V,
+             'P': block.P,
+             'I': block.I,
+             'Z': block.Z
         }
 
         self.upper_limit = load.keys()
@@ -58,7 +56,7 @@ class Stockman:
         if not self.check_mods(part):
             return False
 
-        units = values[params.index('units')] if 'units' in params else 1
+        units = int(values[params.index('units')] if 'units' in params else 1)
         if not self.is_units_enough(part, units):
             return False
 
@@ -156,7 +154,7 @@ class Stockman:
         if u(value) >= u(desire) * multiple:
             return True
 
-        return False 
+        return False
 
     def is_units_enough(self, part, units):
         part_units = part.params.where(Param.name == 'units')

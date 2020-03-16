@@ -24,23 +24,23 @@ class Base(Combination()):
             value -- A resistor is made out of some conducting stuff (carbon, or a thin metal or carbon film, or wire of poor conductivity), with a wire or contacts at each end. It is characterized by its resistance.
             V_drop -- Voltage drop after resistor with Load
         """
-
         self.Power = self.value
         self.consumption(self.V)
 
         # Power Dissipation
-        I_total = self.current(self.V, self.R_load + self.value)
-
+        I_total = self.V / (self.R_load + self.value)
         self.V_drop = self.value * I_total
 
         self.load(self.V - self.V_drop)
 
+    def part_spice(self, *args, **kwargs):
+        return Build('R').spice(*args, **kwargs)
+
+
+    # Lcapy experimental
     def network(self):
         return R(self.value)
 
     # def expression(self, time=0 @ u_s):
     #     return self.input + R(self.value)
-
-    def part_spice(self, *args, **kwargs):
-        return Build('R').spice(*args, **kwargs)
 

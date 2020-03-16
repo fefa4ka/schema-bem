@@ -179,6 +179,7 @@ class Base(Block):
             for net in related_nets:
                 setattr(self, net, original_net)
 
+
     # TODO: Experimental
     def transfer(self):
         if hasattr(self, 'network'):

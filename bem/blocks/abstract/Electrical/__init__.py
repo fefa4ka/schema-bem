@@ -12,6 +12,11 @@ class Base(Network(port='one')):
     element = None
     ref = ''
 
+    # For stockman
+    P = 0 @ u_W
+    I = 0 @ u_A
+    Z = 0 @ u_Ohm
+
     def __init__(self, *args, **kwargs):
         sys.setprofile(None)
 
@@ -24,7 +29,13 @@ class Base(Network(port='one')):
         if is_ciruit_building:
             self.release()
 
-        if hasattr(self, 'Power') and not hasattr(self, 'P'):
+        if hasattr(self, 'Power') and not self.P:
+            self.consumption(self.V)
+
+    def mount(self, *args, **kwargs):
+        super().mount(*args, **kwargs)
+
+        if hasattr(self, 'Power'):
             self.consumption(self.V)
 
     def release(self):
@@ -96,14 +107,15 @@ class Base(Network(port='one')):
 
     # Consumption and Load
     def consumption(self, V):
-        self.P = None
-        self.I = None
-        self.Z = None
+        # Reset class attributes, make it uniq for instance
+        self.P = None # 0 @ u_W #None
+        self.I = None # 0 @ u_A #None
+        self.Z = None # 0 @ u_Ohm #None
 
-        if not hasattr(self, 'Power') or self.Power == 0 @ u_Ohm or V == 0:
+        if not V or not hasattr(self, 'Power'):
             return
 
-        Power = self.Power 
+        Power = self.Power
 
         if Power.is_same_unit(1 @ u_Ohm):
             self.Z = Power
@@ -124,9 +136,11 @@ class Base(Network(port='one')):
         self.G = (1 / self.Z) @ u_S
 
     def load(self, V_load):
+        # Predefine instance attributes
         self.R_load = None
         self.I_load = None
         self.P_load = None
+
         self.V_load = V_load
         Load = self.Load
 
