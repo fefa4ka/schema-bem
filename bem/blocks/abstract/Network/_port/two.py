@@ -12,7 +12,6 @@ class Modificator(Base):
 
     def __series__(self, instance):
         if self.output and instance.input:
-            self.output._name = instance.input._name = f'{self.name}{instance.name}_Net'
             self.output += instance.input
 
         if self.output_n and instance.input_n:

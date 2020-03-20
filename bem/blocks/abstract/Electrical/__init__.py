@@ -44,7 +44,14 @@ class Base(Network(port='one')):
         name = self.get_ref()
 
         # TODO: Hack for schema-explorer
-        self.ref = self.name if name in ['Block', 'Instance'] else name
+        self.ref = ref = self.name if name in ['Block', 'Instance'] else name
+        ref_index = 1
+        while self.ref in self.refs:
+            self.ref = ref + '_' + str(ref_index)
+            ref_index += 1
+
+        self.refs.append(self.ref)
+
         name = self.ref
         name = name.split('.')[-1]
 
@@ -74,6 +81,8 @@ class Base(Network(port='one')):
 
         self.annotate_pins_connections()
 
+        super().release()
+
     def annotate_pins_connections(self):
         pads = self.get_pins()
 
@@ -94,7 +103,7 @@ class Base(Network(port='one')):
             R_load -- Connected load presented in Ohms
             P_load -- Connected load presented in Watts
         """
-        self.load(V)
+        self.load(self.V)
 
     # Circuit Creation
     def circuit(self, *args, **kwargs):

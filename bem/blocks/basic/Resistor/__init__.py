@@ -15,6 +15,14 @@ class Base(Combination()):
 
     Generic resistance.
     Resistance implemented by combination of series or parallel connected resistors from available values in stock.
+    ```
+    vs = VS(flow='SINEV')(V=5, frequency=120)
+    load = Resistor()(1000)
+
+    vs & load & vs
+
+    Instance = load
+    ```
 
     """
     increase = True

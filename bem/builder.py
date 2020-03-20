@@ -48,8 +48,12 @@ class Build:
                 if type(value) == list:
                     self.mods[mod] = value
                 else:
-                    value = str(value)
-                    self.mods[mod] = value.split(',')
+                    if type(value) == str:
+                        value = value.split(',') 
+                    else:
+                        value = [value]
+
+                    self.mods[mod] = value
 
             for mod, value in self.base.mods.items():
                 if not self.mods.get(mod, None):
@@ -61,7 +65,7 @@ class Build:
 
                 for value in values:
                     for mod_block_dir in set([block_dir]):
-                        module_file = Path(BLOCKS_PATH) / mod_block_dir / ('_' + mod) / (value + '.py')
+                        module_file = Path(BLOCKS_PATH) / mod_block_dir / ('_' + mod) / (str(value) + '.py')
                         if module_file.exists():
                             Module = importlib.import_module(MODULE_PATH + '.' + mod_block_dir.replace('/', '.') + '._' + mod + '.' + value)
                             self.models.append(Module.Modificator)

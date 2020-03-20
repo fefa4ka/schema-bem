@@ -166,6 +166,8 @@ class Simulate:
 
 
 def set_spice_enviroment():
+    Block.scope = []
+    Block.refs = []
     set_backup_lib('.')
     set_default_tool(SPICE)
     builtins.SIMULATION = True

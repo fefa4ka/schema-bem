@@ -180,7 +180,7 @@ class Base(Block):
                 setattr(self, net, original_net)
 
 
-    # TODO: Experimental
+    # TODO: Lcapy experimental
     def transfer(self):
         if hasattr(self, 'network'):
             network = self.network()

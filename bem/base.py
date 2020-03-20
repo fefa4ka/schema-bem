@@ -12,10 +12,18 @@ import re
 
 import builtins
 
-logger = logging.getLogger(__name__)
-
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_handler = logging.FileHandler('bem.log')
+log_handler.setFormatter(formatter)
+log.addHandler(log_handler)
 
 class Block:
+    scope = []
+    owner = [None]
+    refs = []
+
     mods = {}
     props = {}
 
@@ -31,6 +39,10 @@ class Block:
         return value
 
     def __init__(self, *args, **kwargs):
+        self.log('init')
+        self.scope.append((self.owner[-1], self))
+        self.owner.append(self)
+
         sys.setprofile(None)
 
         # Grab name of variable used for instance of this Block
@@ -127,6 +139,33 @@ class Block:
                 value = kwargs[arg](self)
                 setattr(self, arg, value)
 
+    @classmethod
+    def hierarchy(cls):
+        def block_ref(block):
+            return block.ref if not hasattr(block, 'part') and block else ' ' + getattr(block, 'ref', '_')
+
+        lst = [(block_ref(item[0]), block_ref(item[1])) for item in Block.scope]
+        graph = {name: set() for tup in lst for name in tup}
+        has_parent = {name: False for tup in lst for name in tup}
+        for parent, child in lst:
+            graph[parent].add(child)
+            has_parent[child] = True
+
+        # All names that have absolutely no parent:
+        roots = [name for name, parents in has_parent.items() if not parents]
+
+        # traversal of the graph (doesn't care about duplicates and cycles)
+        def traverse(hierarchy, graph, names):
+            for name in names:
+                key = name
+                if name[0] == ' ':
+                    key = name[1:]
+                hierarchy[key] = traverse({}, graph, graph[name])
+            return hierarchy
+
+        root = traverse({}, graph, roots)
+        return root['_'] 
+
     def mount(self, *args, **kwargs):
         # Last class is object
         classes = list(inspect.getmro(self.__class__))[:-1]
@@ -141,11 +180,14 @@ class Block:
                 if len(mount_args_keys) == 1:
                     args = []
 
-                mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
+                mount_args = {key: getattr(self, key) for key, value in mount_kwargs.items() if key in mount_args_keys}
                 cls.willMount(self, *args, **mount_args)
 
     def willMount(self):
         pass
+
+    def release(self):
+        self.owner.pop()
 
     @property
     def SIMULATION(self):
@@ -393,3 +435,13 @@ class Block:
 
         return params
 
+    def __repr__(self):
+        return '<%s.%s object at %s>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            hex(id(self))
+        )
+
+    @classmethod
+    def log(cls, message, *args):
+        log.info(hex(id(cls)) + ' ' + cls.name + ': ' + message, *args)

@@ -1,7 +1,7 @@
 # Byte-compiled / optimized / DLL files
 _clone/
 _api/
-bem/node_modules/
+bem/printer/node_modules/
 skidl/
 spice/
 kicad/

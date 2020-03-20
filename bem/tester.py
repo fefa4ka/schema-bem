@@ -86,7 +86,19 @@ class Test:
         return description
 
     # Load configuration
+    def test_body_kit(self):
+        from bem.basic import Resistor
+        from bem.basic.source import VS
+
+        load = Resistor()(V=self.block.V_load)
+        power = VS(flow='V')(V=5 @ u_V)
+
+        blocks = [
+            (load, { 'input': ['output'], 'output': ['v_ref'] })
+        ]
+
     def body_kit(self):
+        # Expand to dict
         body_kit = self._body_kit if hasattr(self, '_body_kit') and self._body_kit else test_body_kit
 
         return body_kit
@@ -111,10 +123,6 @@ class Test:
     def circuit(self, args):
         props = self.builder.parse_arguments(args)
         self.block = self.builder(**props)
-
-        gnd = Net('0')
-        gnd.fixed_name = True
-        self.block.gnd += gnd
 
         self.body_kit_circuit()
 

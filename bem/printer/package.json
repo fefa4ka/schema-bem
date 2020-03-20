@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "canvas": "^2.6.1",
+    "canvas2svg": "^1.0.16",
+    "kicad-utils": "^0.2.1",
+    "netlistsvg": "^1.0.1"
+  }
+}

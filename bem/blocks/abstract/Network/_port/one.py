@@ -10,8 +10,7 @@ class Modificator(Base):
 
     # Link Routines
     def __series__(self, instance):
-        if self.output and instance.input:
-            self.output._name = instance.input._name = f'{self.name}{instance.name}_Net'
+        if hasattr(self, 'output') and hasattr(instance, 'input'):
             self.output += instance.input
 
         self.connect_power_bus(instance)

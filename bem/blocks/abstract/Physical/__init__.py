@@ -10,6 +10,7 @@ import sys
 import builtins
 
 class Base(Electrical()):
+    units = 1
     def __getitem__(self, *attrs_or_pins, **criteria):
         if hasattr(self, 'selected_part') and len(attrs_or_pins) == 1:
             attr = attrs_or_pins[0]
@@ -87,6 +88,8 @@ class Base(Electrical()):
             self.part = part.instance.part
             self.unit = part.unit
 
+            part.instance.element.ref += self.get_ref()
+
             builtins.default_circuit.units[self.name].remove(part)
 
         if len(units.keys()) > 1 and not hasattr(part, 'instance'):
@@ -147,10 +150,11 @@ class Base(Electrical()):
         return part(*args, **kwargs)
 
     def part(self, *args, **kwargs):
+        tracer = sys.getprofile()
+        sys.setprofile(None)
+
         # Only one instance of Part could be used in Block
         if not hasattr(self, '_part') or self._part == None:
-            tracer = sys.getprofile()
-            sys.setprofile(None)
             if self.SIMULATION:
                 part = self.part_spice(*args, **kwargs)
             else:
@@ -163,10 +167,13 @@ class Base(Electrical()):
                 part.set_pin_alias('-', 2)
 
             self._part = part
-            sys.setprofile(tracer)
+
+            self.scope.append((self, part))
 
         part = self._part
         part.ref = self.ref or self.get_ref()
+
+        sys.setprofile(tracer)
 
         return part
 
