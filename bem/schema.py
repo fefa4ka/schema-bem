@@ -10,6 +10,8 @@ import json
 from subprocess import PIPE, run
 from bem import Block
 import logging
+from skidl import Part
+
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
@@ -28,6 +30,9 @@ class Schematic:
         self.nets = {}
         self.schema = circuit
         self.hierarchy = Block.hierarchy()
+        self.blocks = Block.created()
+        self.parts = Block.created(Part)
+        circuit._merge_net_names()
 
         # Get connections Part[pin] for each Net
 
@@ -42,12 +47,12 @@ class Schematic:
             self.skin[part] = sch_symbol(lib, device)
 
         # Load symbols
-        for part in self.schema.parts:
+        for ref, part in self.parts.items():
             part_type = part.lib + ':' + part.name
-            self.parts[part.ref] = self.part_data(part)
+            self.parts[ref] = self.part_data(part)
 
-            symbol = sch_symbol(part.lib, part.name)
-            self.skin[part.ref] = symbol
+            symbol = sch_symbol(part.lib, part.name, part.instance.unit)
+            self.skin[ref] = symbol
 
 
     def net_connections(self, net):
@@ -78,7 +83,7 @@ class Schematic:
             'instance': part
         }
 
-        for pin in part.pins:
+        for pin in part.get_pins():
             # TODO: Why here duplicated nets in pin.nets?
             nets = pin.get_nets()
             net_name = str(nets[0].name) if len(nets) > 0 else ''
@@ -171,7 +176,7 @@ class Schematic:
         # Rotate
         if rotation != 0:
             part = self.parts[part_ref]['instance']
-            self.skin[part_ref] = sch_symbol(part.lib, part.name, rotation)
+            self.skin[part_ref] = sch_symbol(part.lib, part.name, part.instance.unit, rotation)
 
     def airwire_power(self):
         # Set pin direction for pins connected to VBUS = input, GND = output
@@ -180,15 +185,7 @@ class Schematic:
 
         is_two_pin = lambda part: part.get('pins_count', 0) == 2
 
-        gnd_parts = self.nets['0']
-        for part_name in gnd_parts:
-            part = self.parts[part_name]
-
-            for pin in gnd_parts[part_name]:
-                part['port_directions'][pin] = 'output'
-                if is_two_pin(part):
-                    self.change_pin_orientation(part_name, pin, 'D')
-                self.airwire(part_name, pin, 'GNDPWR')
+        vcc_processed = []
 
         nets = list(self.nets.keys())
         for net in nets:
@@ -200,9 +197,14 @@ class Schematic:
                     for pin in vs_parts[part_name]:
                         log.info('Part pins %d %s', part.get('pins_count', 0), str(part['connections']))
 
+                        # Maybe some unit doesn't present (for example VCC and GND for OpAmp)
+                        if not part['port_directions'].get(pin, False):
+                            continue
+
                         if part['port_directions'][pin] == 'v_inv':
                             if is_two_pin(part):
                                 self.change_pin_orientation(part_name, pin, 'D')
+                                vcc_processed.append(part_name)
 
                             part['port_directions'][pin] = 'output'
                             self.airwire(part_name, pin, 'GNDPWR')
@@ -210,10 +212,24 @@ class Schematic:
                         else:
                             if is_two_pin(part):
                                 self.change_pin_orientation(part_name, pin, 'U')
+                                vcc_processed.append(part_name)
 
                             part['port_directions'][pin] = 'input'
                             self.airwire(part_name, pin, 'VBUS')
 
+
+        gnd_parts = self.nets.get('0', [])
+        for part_name in gnd_parts:
+            if part_name in vcc_processed:
+                continue
+
+            part = self.parts[part_name]
+
+            for pin in gnd_parts[part_name]:
+                part['port_directions'][pin] = 'output'
+                if is_two_pin(part):
+                    self.change_pin_orientation(part_name, pin, 'D')
+                self.airwire(part_name, pin, 'GNDPWR')
 
     def net_pin_orientations(self, net, without=None):
         orientations = defaultdict(int)
@@ -225,8 +241,7 @@ class Schematic:
             for pin in parts[part]:
                 pin_orientation = self.skin[self.parts[part]['type']]['port_orientation'][pin]
                 orientations[pin_orientation] += 1
-                print(without, net, part, pin)
-                
+
         return orientations
 
     def horizontal(self):
@@ -243,8 +258,10 @@ class Schematic:
             'U': 'D',
             'D': 'U'
         }
+
+        parts = list(self.parts.keys())
         # Get two pin parts
-        for part_name in self.parts.keys():
+        for part_name in parts: #self.parts.keys():
             part = self.parts[part_name]
 
             if is_two_pin(part):
@@ -265,6 +282,8 @@ class Schematic:
 
                     log.info('Orient [%s] %s - %s - %s [%s]', str(orientations_first), first_net, part_name, second_net, str(orientations_second))
                     # if orientations_first['U'] and orientations_second['D']:
+                    # L R in one side and U or D in another - VERTICAL
+
                     if orientations_first['L'] and orientations_second['R']:
                         self.change_pin_orientation(part_name, pins[0], 'R')
                     elif orientations_first['R'] and orientations_second['L']:
@@ -324,7 +343,7 @@ class Schematic:
                     self.airwire(ref, pin_num, 'GNDPWR')
                     if port_orientation[pin_num] == 'D':
                         log.info('Part rotation 180 ° for GND pin: ' + ref)
-                        self.skin[ref] = sch_symbol(part.lib, part.name, 180)
+                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
 
                         return True 
 
@@ -337,7 +356,7 @@ class Schematic:
                     self.change_pin_direction(second_net, 'input', without=ref)
                     if port_orientation[pin_num] == 'U':
                         log.info('Part rotation 180 ° for VBUS pin: ' + ref)
-                        self.skin[ref] = sch_symbol(part.lib, part.name, 180)
+                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
 
                         return True
 
@@ -353,8 +372,7 @@ class Schematic:
         self.skin[ref]['svg'] = symbol['svg']
 
         self.parts[part.ref]['processed'] = True
-        del self.parts[part.ref]['instance']
-      
+
     def generate_skin_svg(self, filename=''):
         svg = '<svg xmlns="http://www.w3.org/2000/svg" \
              xmlns:xlink="http://www.w3.org/1999/xlink" \
@@ -364,8 +382,11 @@ class Schematic:
                         splitsAndJoins="false" \
                         genericsLaterals="true"> \
                     <s:layoutEngine \
-                        org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers="100" \
-                        org.eclipse.elk.spacing.edgeEdge="100" \
+                        org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers="300" \
+                        org.eclipse.elk.layered.spacing.edgeNodeBetweenLayers="0" \
+                        org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="0" \
+                        org.eclipse.elk.spacing.edgeEdge="300" \
+                        org.eclipse.elk.spacing.edgeNode="0" \
                         org.eclipse.elk.layered.nodePlacement.strategy="4" \
                         org.eclipse.elk.direction="3"/>\
                 </s:properties>\
@@ -402,7 +423,7 @@ class Schematic:
 
     def convert_nets(self):
         nets = list(self.nets.keys())
-        for key, part in self.parts.items():
+        for part_name, part in self.parts.items():
             del part['processed']
             del part['ref']
 
@@ -411,10 +432,25 @@ class Schematic:
                 port_type = 'input' if port_type.find('input') != -1 else 'output'
                 direction[port] = port_type
 
-            for pin in part['connections'].keys():
-                part['connections'][pin] = [nets.index(part['connections'][pin])]
+            instance = part.get('instance', False)
+            if instance:
+                del self.parts[part_name]['instance']
+
+            ports = list(part['connections'].keys())
+
+            for pin in ports:
+                net = part['connections'][pin]
+                # If pin doesn't exists:
+                if not net:
+                    log.info('Delete pin %s.%s %s', part_name, pin, net)
+                    del part['connections'][pin]
+
+                if net:
+                    part['connections'][pin] = [nets.index(net)]
+
 
     def generate(self):
+        # If part doesn't have enought pins, create airwires
         self.airwire_power()
         self.horizontal()
 
@@ -444,19 +480,23 @@ class Schematic:
 
 
 def generate_schematics(circuit):
+    # Generate schematics from SCOPE, use hierarchy for better layout
+    # Because in circuit saved whole part not unit
     schema = Schematic(circuit)
 
     return schema.generate()
 
+from functools import lru_cache
+from pathlib import Path
 
+def sch_symbol(library, device, unit=1, rotate=0):
+    import string
 
-def sch_symbol(library, device, rotate=0):
-    from pathlib import Path
-    module_path = Path(os.path.dirname(__file__)) / 'printer'
-    command = ['node', 'sch2svg.js', library, device, str(rotate)]
-    result = run(command, cwd=module_path, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-    symbol = json.loads(result.stdout)
-    port_orientation = { draw['num']: draw['orientation'] for draw in symbol['component']['draw']['objects'] if draw.get('num', None) }
+    if type(unit) == str:
+        unit = string.ascii_uppercase.index(unit.upper()) + 1
+
+    symbol = json.loads(sch2svg(library, device, unit, rotate))
+    port_orientation = symbol['port_orientation']
     orientation = 'N'
     symbol['port_orientation'] = port_orientation
     if len(port_orientation) == 2:
@@ -467,6 +507,15 @@ def sch_symbol(library, device, rotate=0):
 
     symbol['orientation'] = orientation
 
-    log.info('Load symbol %s / %s %d ° : length %d', library, device, rotate, len(result.stdout))
+    log.info('Load symbol %s / %s.%d %d °', library, device, unit, rotate)
 
     return symbol
+
+@lru_cache(maxsize=100)
+def sch2svg(library, device, unit, rotate):
+    command = ['node', 'sch2svg.js', library, device,  str(unit), str(rotate)]
+    module_path = Path(os.path.dirname(__file__)) / 'printer'
+    result = run(command, cwd=module_path, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+
+    return result.stdout
+

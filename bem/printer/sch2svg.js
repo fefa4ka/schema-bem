@@ -18,6 +18,7 @@ const {
     PinOrientation
 } = require("kicad-utils")
 
+const DrawPin = Lib.DrawPin
 const DEFAULT_LINE_WIDTH = 6
 const canvas2svg = require('canvas2svg')
 
@@ -25,9 +26,9 @@ const { createCanvas } = require('canvas')
 const canvas = createCanvas(150, 150);
 
 const args = process.argv.slice(2)
-const [library_name, device_name, rotate] = args
+const [library_name, device_name, unit, rotate] = args
 
-const device = fs.readFileSync('/Users/fefa4ka/Development/schema.vc/kicad/library/' + library_name + '.lib').toString()
+const device = fs.readFileSync('/Library/Application\ Support/kicad/library/' + library_name + '.lib').toString()
 
 const lib = Lib.Library.load(device)
 
@@ -101,10 +102,10 @@ class SkinPlotter extends SVGPlotter {
 
 class SchSkinPlotter extends SchPlotter {
     plotDrawPin(draw, component, transform) {
+        this.plotDrawPinReference(draw, component, transform)
 		if (!draw.visibility) return;
 		this.plotDrawPinTexts(draw, component, transform);
         this.plotDrawPinSymbol(draw, component, transform);
-        this.plotDrawPinReference(draw, component, transform)
     }
 
     plotDrawPinReference(draw, component, transform) {
@@ -201,18 +202,26 @@ if(rotate == 0) transform = new Transform(1, 0, 0, -1) // Base
 if(rotate == 90) transform = new Transform(0, 1, -1, 0) // 90
 if(rotate == 180) transform = new Transform(-1, 0, 0, 1) // 180 
 if(rotate == 270 || rotate == -90) transform = new Transform(0, -1, -1, 0) // 270
-
 svgPlotter.startPlot()
 svgPlotter.startG({ type, width, height }, '')
 svgPlotter.addTag('s:alias', { val: type })
-schSvgPlotter.plotLibComponent(component, 1, 1, transform)
-schSvgPlotter.plotLibComponentField(component, 1, 1, transform)
+schSvgPlotter.plotLibComponent(component, parseInt(unit), 1, transform)
+schSvgPlotter.plotLibComponentField(component, parseInt(unit), 1, transform)
 svgPlotter.endG()
 svgPlotter.endPlot()
 
 console.log(JSON.stringify({
 	svg: schSvgPlotter.plotter.output,
-	component
+    port_orientation: component.draw.objects
+        .filter(item => item instanceof DrawPin)
+        .map(pin => ({
+            pin: pin.num,  
+            orientation: schSvgPlotter.pinDrawOrientation(pin, transform)
+        })).reduce((pins, pin) => {
+            pins[pin.pin] = pin.orientation
+
+            return pins
+        }, {})
 }))
 
 

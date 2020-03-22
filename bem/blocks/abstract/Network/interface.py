@@ -1,11 +1,11 @@
 from . import Base
-from types import MethodType 
+from types import MethodType
 
 class Interfaced(Base):
     interfaces = []
     pins = {
         'v_ref': True,
-        'gnd': True 
+        'gnd': True
     }
 
     def __and__(self, instance):

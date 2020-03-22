@@ -27,6 +27,7 @@ class Base(Electrical()):
 
     def willMount(self, model=''):
         part = self.props.get('part', None)
+        self.unit = 'A'
 
         if part:
             self.selected_part = part
@@ -69,6 +70,8 @@ class Base(Electrical()):
         if part == None:
             self.part_unavailable()
 
+        ref = self.get_ref()
+
         self.selected_part = part
 
         if self.selected_part.model != self.model:
@@ -83,12 +86,11 @@ class Base(Electrical()):
         for pin in self.selected_part.pins:
             units[pin.unit][pin.block_pin].append(pin.pin)
 
-        self.unit = 'A'
         if hasattr(part, 'instance'):
-            self.part = part.instance.part
+            self._part = part.instance._part
             self.unit = part.unit
 
-            part.instance.element.ref += self.get_ref()
+            part.instance.element.ref += ref 
 
             builtins.default_circuit.units[self.name].remove(part)
 
@@ -99,8 +101,6 @@ class Base(Electrical()):
                 free_unit_part = copy(part)
                 free_unit_part.unit = free_unit
                 builtins.default_circuit.units[self.name].append(free_unit_part)
-
-        self.part_aliases()
 
     # Physical or Spice Part
     def part_template(self):
@@ -132,15 +132,13 @@ class Base(Electrical()):
         if not units.get(self.unit, None):
             return
 
-        part = self.part()
-
         for block_pin in units[self.unit].keys():
             for part_pin in units[self.unit][block_pin]:
                 pin_number = int(part_pin.split('/')[1])
                 device_name = self.name.replace('.', '')
                 net_name =  device_name + ''.join([word.capitalize() for word in block_pin.split('_')]) + str(pin_number)
                 pin_net = Net(net_name)
-                pin_net += part[pin_number]
+                pin_net += self._part[pin_number]
 
                 setattr(self, block_pin, pin_net)
 
@@ -150,8 +148,11 @@ class Base(Electrical()):
         return part(*args, **kwargs)
 
     def part(self, *args, **kwargs):
+        # Stop profiler started in Block.__init__
         tracer = sys.getprofile()
         sys.setprofile(None)
+
+        is_mounted = True in [item[1] == self for item in self.scope]
 
         # Only one instance of Part could be used in Block
         if not hasattr(self, '_part') or self._part == None:
@@ -168,11 +169,22 @@ class Base(Electrical()):
 
             self._part = part
 
+        part = self._part
+        ref = self.ref or self.get_ref()
+        part.ref = ref
+
+        if is_mounted:
+            self.part_aliases()
+
+        if hasattr(self, 'unit') and hasattr(part, 'unit') and part.unit.get('u' + self.unit, False):
+            part = getattr(part, 'u' + self.unit)
+            part._ref = ref
+
+        if is_mounted:
             self.scope.append((self, part))
 
-        part = self._part
-        part.ref = self.ref or self.get_ref()
-
+        part.instance = self
+        # Restart profiler
         sys.setprofile(tracer)
 
         return part

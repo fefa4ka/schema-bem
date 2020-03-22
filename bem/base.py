@@ -24,9 +24,6 @@ class Block:
     owner = [None]
     refs = []
 
-    mods = {}
-    props = {}
-
     files = ['bem/base.py']
     inherited = []
 
@@ -140,9 +137,26 @@ class Block:
                 setattr(self, arg, value)
 
     @classmethod
-    def hierarchy(cls):
+    def created(cls, block_type=None):
         def block_ref(block):
             return block.ref if not hasattr(block, 'part') and block else ' ' + getattr(block, 'ref', '_')
+
+        blocks = {}
+
+        for pair in Block.scope:
+            if issubclass(pair[1].__class__, block_type or Block):
+                block = pair[1]
+                blocks[block_ref(block)] = block
+
+        return blocks
+
+    @classmethod
+    def hierarchy(cls):
+        def block_ref(block):
+            if not hasattr(block, 'part') and block:
+                return block.ref
+            else:
+                return ' ' + getattr(block, 'ref', '_')
 
         lst = [(block_ref(item[0]), block_ref(item[1])) for item in Block.scope]
         graph = {name: set() for tup in lst for name in tup}
@@ -434,13 +448,6 @@ class Block:
                 }
 
         return params
-
-    def __repr__(self):
-        return '<%s.%s object at %s>' % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            hex(id(self))
-        )
 
     @classmethod
     def log(cls, message, *args):

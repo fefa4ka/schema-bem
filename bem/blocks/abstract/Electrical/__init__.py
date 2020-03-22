@@ -77,7 +77,7 @@ class Base(Network(port='one')):
             if key != 'self' and hasattr(value, 'element') and value not in values and value.element:
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
                 values.append(value)
-                value.element.ref = name + '_' + key
+                value._part.ref = name + '_' + key
 
         self.annotate_pins_connections()
 
