@@ -9,7 +9,7 @@ from inspect import getmro
 from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
-
+import inspect
 
 class Build:
     name = None
@@ -55,9 +55,16 @@ class Build:
 
                     self.mods[mod] = value
 
-            for mod, value in self.base.mods.items():
-                if not self.mods.get(mod, None):
-                    self.mods[mod] = value
+            classes = list(inspect.getmro(self.base))[:-1]
+            # Clear builder duplicates
+            classes = [cls for cls in classes if 'builder' not in str(cls)]
+            classes.reverse()
+
+            for base in classes:
+                if hasattr(base, 'mods'):
+                    for mod, value in base.mods.items():
+                        if not self.mods.get(mod, None):
+                            self.mods[mod] = value
 
             for mod, values in self.mods.items():
                 if type(values) != list:
@@ -75,6 +82,7 @@ class Build:
                                 self.files.append(str(module_file))
 
                             mods = Module.Modificator.mods if hasattr(Module.Modificator, 'mods') else None
+
                             if mods:
                                 self.mods = {
                                     **mods,
@@ -105,6 +113,9 @@ class Build:
 
         ancestor = ancestor or self.base
         mods = ancestor.mods if ancestor and hasattr(ancestor, 'mods') else self.mods
+
+        self.mods = { **mods, **self.mods }
+
         inherited = ancestor.inherited if hasattr(ancestor, 'inherited') else []
         for parent in inherited:
             ParentBlock = parent(**mods)

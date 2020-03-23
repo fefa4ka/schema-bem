@@ -4,13 +4,18 @@
 """
 Handler for reading YOSYS libraries and generating netlists.
 """
-import os
-from collections import defaultdict
 import json
-from subprocess import PIPE, run
-from bem import Block
 import logging
+import os
+import re
+from collections import defaultdict
+from functools import lru_cache
+from pathlib import Path
+from subprocess import PIPE, run
+
 from skidl import Part
+
+from bem import Block
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -220,14 +225,11 @@ class Schematic:
 
         gnd_parts = self.nets.get('0', [])
         for part_name in gnd_parts:
-            if part_name in vcc_processed:
-                continue
-
             part = self.parts[part_name]
 
             for pin in gnd_parts[part_name]:
                 part['port_directions'][pin] = 'output'
-                if is_two_pin(part):
+                if is_two_pin(part) and part_name not in vcc_processed:
                     self.change_pin_orientation(part_name, pin, 'D')
                 self.airwire(part_name, pin, 'GNDPWR')
 
@@ -384,10 +386,14 @@ class Schematic:
                     <s:layoutEngine \
                         org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers="300" \
                         org.eclipse.elk.layered.spacing.edgeNodeBetweenLayers="0" \
-                        org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="0" \
+                        org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="-500" \
+                        org.eclipse.elk.spacing.nodeNode="0" \
                         org.eclipse.elk.spacing.edgeEdge="300" \
                         org.eclipse.elk.spacing.edgeNode="0" \
-                        org.eclipse.elk.layered.nodePlacement.strategy="4" \
+                        org.eclipse.elk.layered.nodePlacement.strategy="5" \
+                        org.eclipse.elk.layered.compaction.connectedComponents="true"\
+                        org.eclipse.elk.layered.compaction.postCompaction.constraints="QUADRATIC"\
+                        org.eclipse.elk.layered.compaction.postCompaction.strategy="EDGE_LENGTH"\
                         org.eclipse.elk.direction="3"/>\
                 </s:properties>\
                 <style>\
@@ -471,9 +477,12 @@ class Schematic:
         svg = svg_file.readlines()
         svg_file.close()
 
+
+        width = re.findall("<svg(?:\D+=\"\S*\")*\s+width=\"(\d*)\"", svg[0])[0]
+        height = re.findall("<svg(?:\D+=\"\S*\")*\s+height=\"(\d*)\"", svg[0])[0]
         svg[0] = '<svg xmlns="http://www.w3.org/2000/svg" \
              xmlns:xlink="http://www.w3.org/1999/xlink" \
-             xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 10000 10000">'
+             xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 %s %s">' % (width, height)
 
 
         return ''.join(svg)
@@ -486,8 +495,6 @@ def generate_schematics(circuit):
 
     return schema.generate()
 
-from functools import lru_cache
-from pathlib import Path
 
 def sch_symbol(library, device, unit=1, rotate=0):
     import string
@@ -518,4 +525,3 @@ def sch2svg(library, device, unit, rotate):
     result = run(command, cwd=module_path, stdout=PIPE, stderr=PIPE, universal_newlines=True)
 
     return result.stdout
-

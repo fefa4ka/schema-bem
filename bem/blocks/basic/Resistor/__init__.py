@@ -11,17 +11,18 @@ from bem.abstract import Combination, Physical
 import logging
 
 class Base(Combination()):
-    """Resistor
-
+    """
     Generic resistance.
+
     Resistance implemented by combination of series or parallel connected resistors from available values in stock.
+
     ```
     vs = VS(flow='SINEV')(V=5, frequency=120)
     load = Resistor()(1000)
 
     vs & load & vs
 
-    Instance = load
+    watch = load
     ```
 
     """

@@ -1,16 +1,13 @@
+import builtins
 import inspect
-
+import logging
 import re
 import sys
 from copy import copy
 from types import FunctionType
-import logging
 
 from PySpice.Unit import FrequencyValue, PeriodValue
 from PySpice.Unit.Unit import UnitValue
-import re
-
-import builtins
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -271,6 +268,11 @@ class Block:
     # Virtual Part
     @classmethod
     def get_default_arguments(cls):
+        def uniq_f7(seq):
+            seen = set()
+            seen_add = seen.add
+            return [x for x in seq if not (x in seen or seen_add(x))]
+
         args = []
         defaults = {}
 
@@ -294,7 +296,7 @@ class Block:
                         }
                 }
 
-        args = list(set([arg for arg in args if arg != 'self']))
+        args = uniq_f7([arg for arg in args if arg != 'self'])
 
         return args, defaults
 
