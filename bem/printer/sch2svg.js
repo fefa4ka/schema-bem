@@ -66,7 +66,7 @@ class SkinPlotter extends SVGPlotter {
 
         this.output += this.xmlTag `<g ${transform ? 'transform="${transform}"' : ''} ${tagProps}/>`
     }
-    text(
+    value(
 		p,
 		color,
 		text,
@@ -79,10 +79,9 @@ class SkinPlotter extends SVGPlotter {
 		bold,
 		multiline
 	) {
-        this.output += this.xmlTag `<text style="font-size:${size}px;" class="nodevalue $cell_id" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" s:attribute="value">${text}</text>`
+        this.output += this.xmlTag `<text style="font-size:${size}px;" class="nodevalue $cell_id" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" ${text ? '' : 's:attribute="value"'}>${text}</text>`
 	}
-
-    label(
+       label(
 		p,
 		color,
 		text,
@@ -145,15 +144,25 @@ class SchSkinPlotter extends SchPlotter {
                 } else {
                     orientation = TextAngle.HORIZ;
                 }
+            
             }
-            let text = 'Very_Long_Reference' //component.field.reference;
-			const width  = 0 //this.plotter.font.computeTextLineSize(text, component.field.textSize, DEFAULT_LINE_WIDTH);
-			const height = 0 //this.plotter.font.getInterline(component.field.textSize, DEFAULT_LINE_WIDTH);
 
+            const text = 'Very_Long'
+			let width  = 0//this.plotter.font.computeTextLineSize(text, 14, DEFAULT_LINE_WIDTH);
+			let height = this.plotter.font.getInterline(14, DEFAULT_LINE_WIDTH);
+            let px = width * -1, py = height;
+
+            if(orientation != 0) {
+                px = height
+                py = width * -1
+            }
+            
+            
+            
             this.plotter.label(
-                Point.add({ x: width / 2, y: height / 2 }, pos),
+                Point.add({ x: px, y: py}, pos),
                 '',
-                text,
+                component.field.reference || {},
                 orientation,
                 component.field.textSize,
                 '',
@@ -173,13 +182,21 @@ class SchSkinPlotter extends SchPlotter {
 					orientation = TextAngle.HORIZ;
 				}
 			}
-			let text = '10 000 V'// component.fields[0].name;
-			const width  = 0//this.plotter.font.computeTextLineSize(text, component.fields[0].textSize, DEFAULT_LINE_WIDTH);
-			const height = 0//this.plotter.font.getInterline(component.fields[0].textSize, DEFAULT_LINE_WIDTH);
-			this.plotter.text(
-				Point.add({ x: width / 2, y: height / 2 }, pos),
+
+            const text = '10 mV'
+			let width  = this.plotter.font.computeTextLineSize(text, 14, DEFAULT_LINE_WIDTH);
+			let height = this.plotter.font.getInterline(14, DEFAULT_LINE_WIDTH);
+            let px = width * -1, py = height;
+
+            if(orientation != 0) {
+                px = height
+                py = width * -1
+            }
+            
+			this.plotter.value(
+				Point.add({ x: px, y: py }, pos),
 			    '',	
-				text,
+				component.fields[0].reference || '',
 				orientation,
 				component.fields[0].textSize,
 				TextHjustify.CENTER,

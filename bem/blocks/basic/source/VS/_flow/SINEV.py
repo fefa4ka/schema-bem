@@ -6,6 +6,9 @@ from numpy import linspace
 
 class Modificator(Base):
     def willMount(self, frequency=1 @ u_Hz, dc_offset=0@ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
+        if type(frequency) == list:
+            self.Frequency_range = frequency
+
         self.amplitude = self.V
 
     def get_spice_arguments(self):
@@ -16,7 +19,10 @@ class Modificator(Base):
         return arguments
 
     def part(self):
-        return super().part(**self.get_spice_arguments())
+        if self.SIMULATION:
+            return super().part(**self.get_spice_arguments())
+        else:
+            return super().part(value='~ ' + str(self.V) + ' / ' + str(self.frequency))
 
     def network(self):
         return Vac(self.amplitude)

@@ -1,4 +1,4 @@
-from bem import u
+from bem import u, Block
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
@@ -74,10 +74,18 @@ class Base(Network(port='one')):
         values = []
 
         for key, value in self.circuit_locals.items():
-            if key != 'self' and hasattr(value, 'element') and value not in values and value.element:
+            is_block_has_part = hasattr(value, 'element') and value.element
+            is_block = issubclass(value.__class__, Block)
+            is_not_refed = value not in values
+            if key != 'self' and is_block and is_not_refed:
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
-                values.append(value)
-                value._part.ref = name + '_' + key
+                ref = name + '_' + key
+
+                if is_block_has_part:
+                    values.append(value)
+                    value._part.ref = ref
+
+                value.ref = ref
 
         self.annotate_pins_connections()
 

@@ -3,15 +3,17 @@ import inspect
 import logging
 import re
 import sys
+from os import path
 from copy import copy
 from types import FunctionType
 
 from PySpice.Unit import FrequencyValue, PeriodValue
 from PySpice.Unit.Unit import UnitValue
+from .util import uniq_f7
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
 log_handler = logging.FileHandler('bem.log')
 log_handler.setFormatter(formatter)
 log.addHandler(log_handler)
@@ -33,7 +35,8 @@ class Block:
         return value
 
     def __init__(self, *args, **kwargs):
-        self.log('init')
+        self.log(', '.join([key + ' = ' + str(value) for key, value in kwargs.items()]))
+
         self.scope.append((self.owner[-1], self))
         self.owner.append(self)
 
@@ -175,7 +178,8 @@ class Block:
             return hierarchy
 
         root = traverse({}, graph, roots)
-        return root['_'] 
+
+        return root['_']
 
     def mount(self, *args, **kwargs):
         # Last class is object
@@ -191,14 +195,21 @@ class Block:
                 if len(mount_args_keys) == 1:
                     args = []
 
-                mount_args = {key: getattr(self, key) for key, value in mount_kwargs.items() if key in mount_args_keys}
+                mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
                 cls.willMount(self, *args, **mount_args)
+
+        params = self.get_params()
+
+        self.log(', '.join([key + ' = ' + str(getattr(self, key)) for key, value in kwargs.items()]))
 
     def willMount(self):
         pass
 
     def release(self):
         self.owner.pop()
+
+        params = self.get_params()
+        self.log(', '.join([key + ' = ' + str(value['value']) + ' ' + value['unit'].get('suffix', '') for key, value in params.items()]))
 
     @property
     def SIMULATION(self):
@@ -210,12 +221,17 @@ class Block:
     def __str__(self):
         name = []
         for key, value in self.mods.items():
+            # TODO: Fix hack for network mod
+            if key == 'port':
+                continue
+
             name.append(' '.join([str(el).capitalize() for el in value]) + ' ' + key.capitalize())
 
         for word in self.name.split('.'):
             name.append(word.capitalize())
 
         return ' '.join(name)
+
 
     def get_description(self):
         """
@@ -268,10 +284,6 @@ class Block:
     # Virtual Part
     @classmethod
     def get_default_arguments(cls):
-        def uniq_f7(seq):
-            seen = set()
-            seen_add = seen.add
-            return [x for x in seq if not (x in seen or seen_add(x))]
 
         args = []
         defaults = {}
@@ -363,14 +375,18 @@ class Block:
                 #    props[attr] = arg
                 # elif type(props[attr]) == list:
                 #    props[attr] = props[attr][0]
-                # elif isinstance(arg, Block):
-                #     props[attr] = arg
-                # elif isinstance(arg, FunctionType):
-                #     props[attr] = arg
                 elif type(props[attr]) in [UnitValue, PeriodValue, FrequencyValue]:
                     if type(arg) in [UnitValue, PeriodValue, FrequencyValue]:
+                        # unit value
                         props[attr] = arg
+                    elif type(arg) == slice:
+                        # slice(start, stop, step)
+                        props[attr]._value = arg.stop
+                    elif type(arg) == list:
+                        # Rage [start, stop]
+                        props[attr]._value = arg[1]
                     else:
+                        # number
                         props[attr]._value = float(arg)
                 else:
                     props[attr] = arg
@@ -451,6 +467,15 @@ class Block:
 
         return params
 
-    @classmethod
-    def log(cls, message, *args):
-        log.info(hex(id(cls)) + ' ' + cls.name + ': ' + message, *args)
+    def log(self, message, *args):
+        # Get the previous frame in the stack, otherwise it would
+        # be this function
+        func = inspect.currentframe().f_back.f_code
+        anchor = "[%20s:%3i:%15s] - " % (
+            path.basename(path.dirname(func.co_filename)) + '/' + path.basename(func.co_filename),
+            func.co_firstlineno,
+            func.co_name
+        )
+        from codenamize import codenamize
+        block_name = codenamize(id(self), 0)
+        log.info(anchor + block_name + ' ' + self.name + ': ' + str(message), *args)

@@ -19,7 +19,8 @@ from bem import Block
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+FORMAT = "%(levelname)s - [%(filename)10s:%(lineno)3s:%(funcName)20s() ] - %(message)10s"
+formatter = logging.Formatter(FORMAT)# '%(name)s - %(levelname)s - %(message)s')
 log_handler = logging.FileHandler('bem.log')
 log_handler.setFormatter(formatter)
 log.addHandler(log_handler)
@@ -80,11 +81,14 @@ class Schematic:
             'processed': False,
             'ref': part.ref,
             'type': part.ref, #symbol,
+            'name': part.name,
+            'description': [entry.strip() for entry in part.description.split(',')],
             'attributes': {
                 'value': str(value)
             },
             'connections': {},
             'port_directions': {},
+            'port_description': {},
             'instance': part
         }
 
@@ -97,10 +101,10 @@ class Schematic:
             pin_description = pin.notes[-1] if len(pin.notes) else ''
             port_direction = pin_description.split(':')[0] or 'input'
 
-            log.info('Detect pin %s.%s as [%s] from description: %s', part.ref, pin.num, port_direction, '\n'.join(pin.notes))
+            log.info('%s.%s as [%s]: %s', part.ref, pin.num, port_direction, '; '.join(pin.notes))
 
             instance['port_directions'][pin.num] = port_direction
-            instance['description'] = '\n'.join(pin.notes)
+            instance['port_description'][pin.num] = [pin.name] + list(reversed(pin.notes))
 
         instance['pins_count'] = len(part.pins)
 
@@ -111,7 +115,7 @@ class Schematic:
         current_net = part['connections'][pin]
         ref = '_'.join([current_net, part_name, pin])
 
-        log.info('Airwire [%s] <- %s.%s [%s]', line_type, part_name, pin, current_net)
+        log.info('[%s] <- %s.%s [%s]', line_type, part_name, pin, current_net)
 
         self.nets[ref] = { part_name: [pin], ref: ['1'] }
         self.nets[current_net][part_name].remove(pin)
@@ -141,7 +145,7 @@ class Schematic:
         for part_name in self.nets[net].keys():
             if part_name != without:
                 for pin in self.nets[net][part_name]:
-                    log.info('Set pin direction [%s] -> %s.%s, %s', direction, part_name, pin, net)
+                    log.info('[%s] -> %s.%s, %s', direction, part_name, pin, net)
                     self.parts[part_name]['port_directions'][pin] = direction
 
     def change_pin_orientation(self, part_ref, pin, orientation):
@@ -177,7 +181,7 @@ class Schematic:
         }
         rotation = rotation_matrix[orientation][current_orientation]
 
-        log.info('Set pin orientation %s.%s %s -> %s %d °', part_ref, pin, current_orientation, orientation, rotation)
+        log.info('%s.%s %s -> %s %d °', part_ref, pin, current_orientation, orientation, rotation)
         # Rotate
         if rotation != 0:
             part = self.parts[part_ref]['instance']
@@ -188,7 +192,7 @@ class Schematic:
         # Airwire all pins connected to VBUS and GND
         # Rotate (TODO: two pin) parts according to power line. For GND pin orientation is bottom, for VBUS is top
 
-        is_two_pin = lambda part: part.get('pins_count', 0) == 2
+        is_two_pin = lambda part: True or part.get('pins_count', 0) == 2
 
         vcc_processed = []
 
@@ -200,7 +204,7 @@ class Schematic:
                 for part_name in vs_parts:
                     part = self.parts[part_name]
                     for pin in vs_parts[part_name]:
-                        log.info('Part pins %d %s', part.get('pins_count', 0), str(part['connections']))
+                        log.info('%s[%d]: %s', part_name, part.get('pins_count', 0), str(part['connections']))
 
                         # Maybe some unit doesn't present (for example VCC and GND for OpAmp)
                         if not part['port_directions'].get(pin, False):
@@ -282,24 +286,41 @@ class Schematic:
                     orientations_first = self.net_pin_orientations(first_net, part_name)
                     orientations_second = self.net_pin_orientations(second_net, part_name)
 
-                    log.info('Orient [%s] %s - %s - %s [%s]', str(orientations_first), first_net, part_name, second_net, str(orientations_second))
+                    log.info('%s %s - %s - %s %s', str(dict(orientations_first)), first_net, part_name, second_net, str(dict(orientations_second)))
                     # if orientations_first['U'] and orientations_second['D']:
                     # L R in one side and U or D in another - VERTICAL
-
                     if orientations_first['L'] and orientations_second['R']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
+                        if orientations_first['R'] and orientations_second['L']:
+                            if orientations_first['R'] > orientations_first['L'] > orientations_second['L'] > orientations_second['R']:
+                                self.change_pin_orientation(part_name, pins[0], 'L')
+                            elif orientations_second['L'] > orientations_second['R']:
+                                self.change_pin_orientation(part_name, pins[0], 'R')
+                        else:
+                            self.change_pin_orientation(part_name, pins[0], 'R')
                     elif orientations_first['R'] and orientations_second['L']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
-                    elif orientations_first['L']:
                         self.change_pin_orientation(part_name, pins[0], 'L')
-                    elif orientations_first['R']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
-                    elif orientations_first['U'] and orientations_second['U']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
-                    elif orientations_first['D'] and orientations_second['D']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
-                    elif orientations_first['R'] and orientations_second['R']:
+                    elif orientations_first['U'] and orientations_second['D']:
                         self.change_pin_orientation(part_name, pins[0], 'D')
+                    elif orientations_first['D'] and orientations_second['U']:
+                        self.change_pin_orientation(part_name, pins[0], 'U')
+                    elif orientations_first['L'] or orientations_second['R']:
+                        self.change_pin_orientation(part_name, pins[0], 'R')
+                    elif orientations_first['R'] or orientations_second['L']:
+                        self.change_pin_orientation(part_name, pins[0], 'L')
+                    elif orientations_first['U'] and orientations_second['U']:
+                        if orientations_first['U'] >= orientations_second['U']:
+                            self.change_pin_orientation(part_name, pins[0], 'D')
+                        else:
+                            self.change_pin_orientation(part_name, pins[0], 'U')
+                    elif orientations_first['D'] and orientations_second['D']:
+                        if orientations_first['D'] >= orientations_second['D']:
+                            self.change_pin_orientation(part_name, pins[0], 'U')
+                        else:
+                            self.change_pin_orientation(part_name, pins[0], 'D')
+#                    elif orientations_first['D'] and orientations_second['D']:
+#                        self.change_pin_orientation(part_name, pins[0], 'R')
+#                    elif orientations_first['R'] and orientations_second['R']:
+#                        self.change_pin_orientation(part_name, pins[0], 'D')
 
 
 
@@ -307,7 +328,7 @@ class Schematic:
         # Orient first input pin to LEFT
 
     def draw_part(self, part, connected_net=None, parent_side='T'):
-        log.info('Draw part: ' + part.ref)
+        log.info(part.ref + '.' + str(connected_net) + ' <- ' + parent_side)
 
         def pin_from_net(net):
             connections = self.parts[part.ref]['connections']
@@ -344,7 +365,7 @@ class Schematic:
                 if is_gnd:
                     self.airwire(ref, pin_num, 'GNDPWR')
                     if port_orientation[pin_num] == 'D':
-                        log.info('Part rotation 180 ° for GND pin: ' + ref)
+                        log.info('Rotation 180 ° for GND pin: ' + ref)
                         self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
 
                         return True 
@@ -357,7 +378,7 @@ class Schematic:
                     self.parts[ref]['port_directions'][pin_num] = 'output' 
                     self.change_pin_direction(second_net, 'input', without=ref)
                     if port_orientation[pin_num] == 'U':
-                        log.info('Part rotation 180 ° for VBUS pin: ' + ref)
+                        log.info('Rotation 180 ° for VBUS pin: ' + ref)
                         self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
 
                         return True
@@ -428,7 +449,8 @@ class Schematic:
         netlist.close()
 
     def convert_nets(self):
-        nets = list(self.nets.keys())
+        nets = sorted(list(self.nets.keys()))
+
         for part_name, part in self.parts.items():
             del part['processed']
             del part['ref']
@@ -448,7 +470,7 @@ class Schematic:
                 net = part['connections'][pin]
                 # If pin doesn't exists:
                 if not net:
-                    log.info('Delete pin %s.%s %s', part_name, pin, net)
+                    log.info('Delete %s.%s -> %s', part_name, pin, net)
                     del part['connections'][pin]
 
                 if net:
@@ -477,9 +499,8 @@ class Schematic:
         svg = svg_file.readlines()
         svg_file.close()
 
-
-        width = re.findall("<svg(?:\D+=\"\S*\")*\s+width=\"(\d*)\"", svg[0])[0]
-        height = re.findall("<svg(?:\D+=\"\S*\")*\s+height=\"(\d*)\"", svg[0])[0]
+        width = re.findall("<svg(?:\D+=\"\S*\")*\s+width=\"(\d*\.\d+|\d+)\"", svg[0])[0]
+        height = re.findall("<svg(?:\D+=\"\S*\")*\s+height=\"(\d*\.\d+|\d+)\"", svg[0])[0]
         svg[0] = '<svg xmlns="http://www.w3.org/2000/svg" \
              xmlns:xlink="http://www.w3.org/1999/xlink" \
              xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 %s %s">' % (width, height)
@@ -502,6 +523,7 @@ def sch_symbol(library, device, unit=1, rotate=0):
     if type(unit) == str:
         unit = string.ascii_uppercase.index(unit.upper()) + 1
 
+    log.info('%s / %s.%d %d °', library, device, unit, rotate)
     symbol = json.loads(sch2svg(library, device, unit, rotate))
     port_orientation = symbol['port_orientation']
     orientation = 'N'
@@ -514,7 +536,6 @@ def sch_symbol(library, device, unit=1, rotate=0):
 
     symbol['orientation'] = orientation
 
-    log.info('Load symbol %s / %s.%d %d °', library, device, unit, rotate)
 
     return symbol
 

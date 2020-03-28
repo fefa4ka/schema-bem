@@ -1,44 +1,23 @@
+import builtins
 import io
+import logging
+from collections import defaultdict
 from contextlib import redirect_stdout
+from math import log
+
 #from numpy.fft import fft
-from PySpice.Unit import u_ms, u_s
-from skidl import (KICAD, SPICE, Circuit, Net, search, set_default_tool, set_backup_lib,
-                   subcircuit)
+from PySpice.Unit import u_Degree, u_ms, u_s
+from skidl import (KICAD, SPICE, Circuit, Net, search, set_backup_lib,
+                   set_default_tool, subcircuit)
 
 from .base import Block
-from .util import u
-
-import builtins
+from .util import ERC_logger, u
+from pdb import set_trace as bp
 
 libs = ['./spice/']
 
-import logging
-import collections
 
-from PySpice.Unit import u_Degree
 default_temperature = [-30, 0, 25] @ u_Degree
-
-class TailLogHandler(logging.Handler):
-    def __init__(self, log_queue):
-        logging.Handler.__init__(self)
-        self.log_queue = log_queue
-
-    def emit(self, record):
-        self.log_queue.append(self.format(record))
-
-
-class TailLogger(object):
-    def __init__(self, maxlen):
-        self._log_queue = collections.deque(maxlen=maxlen)
-        self._log_handler = TailLogHandler(self._log_queue)
-
-    def contents(self):
-        return '\n'.join(self._log_queue)
-
-    @property
-    def log_handler(self):
-        return self._log_handler
-
 
 class Simulate:
     block = None
@@ -68,15 +47,9 @@ class Simulate:
         self.circuit = circuit.generate_netlist(libs=libs)
 
         # Grab ERC from logger 
-        erc = logging.getLogger('ERC_Logger')
-        tail = TailLogger(10)
-        log_handler = tail.log_handler
-        for handler in erc.handlers[:]:
-            erc.removeHandler(handler)
-
-        erc.addHandler(log_handler)
+        erc = ERC_logger()
         builtins.default_circuit.ERC()
-        self.ERC = tail.contents()
+        self.ERC = erc.contents()
         print(self.circuit)
 
         self.node = node
@@ -144,7 +117,6 @@ class Simulate:
         return self.measures(analysis)
 
     def dc(self, params, temperature=default_temperature):
-        pins = self.block.get_pins().keys()
         measures = {}
         for temp in temperature or default_temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
@@ -155,15 +127,67 @@ class Simulate:
         return measures
 
     def ac(self, temperature=default_temperature, **params):
-        pins = self.block.get_pins().keys()
         measures = {}
         for temp in temperature or default_temperature:
             simulation = self.circuit.simulator(temperature=temp, nominal_temperature=temp)
+
             analysis = simulation.ac(**params)
             measures[str(temp)] = analysis
 
         return measures
 
+    def volt_ampere(self, voltage_sweep, temperature=default_temperature):
+        simulations = Simulate(self.block).dc({ 'VVVS': voltage_sweep }, temperature=temperature)
+        chart = defaultdict(dict)
+        for temp, simulation in simulations.items():
+            label = '@ %s °C' % str(temp)
+            for run in simulation:
+                index = run['sweep']
+                chart[index]['V_input'] = run['V_input']
+                chart[index][label + ' I_vvvs'] = run['I_vvvs']
+
+        sweep = list(chart.keys())
+
+        sweep.sort()
+
+        return [chart[index] for index in sweep]
+
+    def volt_volt(self, voltage_sweep, temperature=default_temperature):
+        simulations = Simulate(self.block).dc({ 'VVVS': voltage_sweep }, temperature=temperature)
+        chart = defaultdict(dict)
+        for temp, simulation in simulations.items():
+            label = '@ %s °C' % str(temp)
+            for run in simulation:
+                index = run['sweep']
+                chart[index]['V_input'] = run['V_input']
+                chart[index]['V_input'] = run['V_output']
+
+        sweep = list(chart.keys())
+
+        sweep.sort()
+
+        return [chart[index] for index in sweep]
+
+    def frequency(self, start_frequency, stop_frequency, temperature=default_temperature, **param):
+        simulations = Simulate(self.block).ac(start_frequency=start_frequency, stop_frequency=stop_frequency, number_of_points=1000, variation='dec', temperature=temperature)
+
+        # analys[temp][freq] = v_out / v_in
+        chart = defaultdict(dict)
+        for temp, simulation in simulations.items():
+            label = '@ %s °C' % str(temp)
+            for index, frequency in enumerate(simulation.frequency):
+                V_in = simulation[self.block.input.name][index]
+                V_out = simulation[self.block.output.name][index]
+                # label += '@ %s' % str(frequency)
+                # index = simulation['sweep']
+                chart[index]['Frequency'] = float(frequency)
+                chart[index][label + ' Gain'] = 20 * log(float(abs(V_out) / abs(V_in)), 10) if V_out and V_in else 0
+
+        sweep = list(chart.keys())
+
+        sweep.sort()
+
+        return [chart[index] for index in sweep]
 
 def set_spice_enviroment():
     Block.scope = []
@@ -173,7 +197,7 @@ def set_spice_enviroment():
     builtins.SIMULATION = True
 
     scheme = Circuit()
-    scheme.units = collections.defaultdict(list)
+    scheme.units = defaultdict(list)
     builtins.default_circuit.reset(init=True)
     del builtins.default_circuit
     builtins.default_circuit = scheme

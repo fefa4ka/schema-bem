@@ -1,4 +1,5 @@
-from bem import Build
+from bem import Build, u_V
+
 from bem.abstract import Physical
 from skidl import Net, Part, TEMPLATE
 from lcapy import log10
@@ -6,6 +7,10 @@ from copy import copy
 
 
 class Base(Physical()):
+    def willMount(self, V = 10 @ u_V):
+        if type(V) == slice:
+            self.V_sweep = V
+
     def part_spice(self, *args, **kwargs):
         flow = self.mods['flow']
         part = flow[0] if type(flow) == list else flow

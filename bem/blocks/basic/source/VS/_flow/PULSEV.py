@@ -15,5 +15,8 @@ class Modificator(Base):
         return arguments
 
     def part(self):
-        return super().part(**self.get_spice_arguments())
+        if self.SIMULATION:
+            return super().part(**self.get_spice_arguments())
+        else:
+            return super().part(value='_| ' + str(self.V))
 

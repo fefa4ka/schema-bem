@@ -1,5 +1,5 @@
 from PySpice.Unit import u_s, u_Hz, u_A, u_V
-
+import collections
 
 _prefix = {
     'y': 1e-24,  # yocto
@@ -146,3 +146,49 @@ def merge(source, destination):
             destination[key] = value
 
     return destination
+
+
+import logging
+
+
+def uniq_f7(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
+
+# ERC Logger grabber
+class TailLogHandler(logging.Handler):
+    def __init__(self, log_queue):
+        logging.Handler.__init__(self)
+        self.log_queue = log_queue
+
+    def emit(self, record):
+        self.log_queue.append(self.format(record))
+
+
+class TailLogger(object):
+    def __init__(self, maxlen):
+        self._log_queue = collections.deque(maxlen=maxlen)
+        self._log_handler = TailLogHandler(self._log_queue)
+
+    def contents(self):
+        return '\n'.join(self._log_queue)
+
+    @property
+    def log_handler(self):
+        return self._log_handler
+
+
+def ERC_logger():
+    erc = logging.getLogger('ERC_Logger')
+    tail = TailLogger(10)
+    log_handler = tail.log_handler
+    for handler in erc.handlers[:]:
+        erc.removeHandler(handler)
+
+    erc.addHandler(log_handler)
+
+    return tail
+
+
