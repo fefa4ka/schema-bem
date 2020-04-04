@@ -1,4 +1,3 @@
-recursive-include tests *
-recursive-include bem *
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
+recursive-include bem *.py
+recursive-include bem/blocks/ *.py
+recursive-include bem/printer/ *
