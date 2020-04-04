@@ -21,8 +21,12 @@ setup(
     author_email='alex@nder.work',
     license='MIT',
     packages=find_packages(exclude=["tests"]),
+    package_dir={"bem": "bem"},
+    include_package_data=True,
+    package_data={"bem": ["*.js", "*.json"]},
     install_requires=requirements,
-    zip_safe=False,
+    zip_safe=True,
+    test_suite="tests",
     cmdclass={
         'npm_install': NPMInstall
     },
