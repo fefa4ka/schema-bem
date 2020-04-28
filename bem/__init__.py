@@ -21,8 +21,11 @@ def bem_scope(root='./blocks'):
     blocks = defaultdict(dict)
 
     # Get Blocks from current root scopes
-    scopes = [ name for name in os.listdir(root) if os.path.isdir(os.path.join(root, name)) ]
-    scopes = [ name for name in scopes if name[0].islower() ]
+    if os.path.isdir(root):
+        scopes = [ name for name in os.listdir(root) if os.path.isdir(os.path.join(root, name)) ]
+        scopes = [ name for name in scopes if name[0].islower() ]
+    else:
+        return {}
 
     for scope in scopes:
         # Get Blocks from current root

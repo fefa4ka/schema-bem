@@ -7,6 +7,8 @@ import sys
 tracer_instances = [None]
 
 class Base(Network(port='one')):
+    mods = {}  # FIX: port=one removing
+
     doc_methods = ['willMount', 'circuit']
 
     element = None
@@ -43,6 +45,7 @@ class Base(Network(port='one')):
 
         name = self.get_ref()
 
+
         # TODO: Hack for schema-explorer
         self.ref = ref = self.name if name in ['Block', 'Instance'] else name
         ref_index = 1
@@ -65,7 +68,9 @@ class Base(Network(port='one')):
 
         try:
             # trace the function 
+            self.log('circuit')
             self.circuit()
+            self.log('circuit finish')
         finally:
             # disable tracer and replace with old one
             tracer_current = tracer_instances.pop()
@@ -86,6 +91,7 @@ class Base(Network(port='one')):
                     value._part.ref = ref
 
                 value.ref = ref
+
 
         self.annotate_pins_connections()
 
@@ -116,11 +122,13 @@ class Base(Network(port='one')):
     # Circuit Creation
     def circuit(self, *args, **kwargs):
         element = self.part(*args, **kwargs)
+
         if element:
             self.element = element
 
-            self.input += self.element[1]
-            self.output += self.element[2]
+            if len(element.pins) == 2:
+                self.input += self.element[1]
+                self.output += self.element[2]
 
     # Consumption and Load
     def consumption(self, V):

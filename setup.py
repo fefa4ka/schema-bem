@@ -1,15 +1,18 @@
 from setuptools import setup, find_packages
 
-from distutils.command.build import build
+from distutils.command.build_py import build_py
 
-class NPMInstall(build):
-    def run(self):
-        self.run_command("npm install -g canvas canvas2svg kicad-utils netlistsvg")
-        build.run(self)
+class NPMInstall(build_py):
+  """Custom build command."""
+
+  def run(self):
+    self.run_command('npn install -g canvas canvas2svg kicad-utils netlistsvg"')
+    build_py.run(self)
 
 requirements = [
     'skidl',
-    'peewee'
+    'peewee',
+    'codenamize'
 ]
 
 setup(
@@ -25,9 +28,9 @@ setup(
     include_package_data=True,
     package_data={"bem": ["*.js", "*.json"]},
     install_requires=requirements,
-    zip_safe=True,
+    zip_safe=False,
     test_suite="tests",
     cmdclass={
         'npm_install': NPMInstall
-    },
+    }
 )

@@ -442,7 +442,7 @@ class Block:
                 continue
 
             if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
-                default = default.canonise()
+                default = default.canonise() if default.value else default
                 params[param] = {
                     'value': round(default.value, 1),
                     'unit': {
@@ -468,6 +468,7 @@ class Block:
         return params
 
     def log(self, message, *args):
+        return
         # Get the previous frame in the stack, otherwise it would
         # be this function
         func = inspect.currentframe().f_back.f_code

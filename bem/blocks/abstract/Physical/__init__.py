@@ -9,6 +9,12 @@ from bem.model import Param
 import sys
 import builtins
 
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+def PartCached(library, symbol, footprint, dest):
+    return Part(library, symbol, footprint=footprint, dest=dest)
+
 class Base(Electrical()):
     units = 1
     def __getitem__(self, *attrs_or_pins, **criteria):
@@ -34,11 +40,18 @@ class Base(Electrical()):
             self.template = self.part_template()
 
     def mount(self, *args, **kwargs):
+        # Stop profiler started in Block.__init__
+        tracer = sys.getprofile()
+        sys.setprofile(None)
+
         super().mount(*args, **kwargs)
 
         if not hasattr(self, 'selected_part'):
             selected_part = self.select_part()
             self.apply_part(selected_part)
+
+        # Restart profiler
+        sys.setprofile(tracer)
 
     def available_parts(self):
         circuit = builtins.default_circuit
@@ -116,7 +129,7 @@ class Base(Electrical()):
             symbol = stock.symbol
 
         # TODO: Very slow func. Speedup Part loading, Cache?
-        part = Part(library, symbol, footprint=self.footprint, dest=TEMPLATE)
+        part = PartCached(library, symbol, footprint=self.footprint, dest=TEMPLATE)
 
         return part
 
@@ -148,9 +161,6 @@ class Base(Electrical()):
         return part(*args, **kwargs)
 
     def part(self, *args, **kwargs):
-        # Stop profiler started in Block.__init__
-        tracer = sys.getprofile()
-        sys.setprofile(None)
 
         is_mounted = True in [item[1] == self for item in self.scope]
 
@@ -184,8 +194,6 @@ class Base(Electrical()):
             self.scope.append((self, part))
 
         part.instance = self
-        # Restart profiler
-        sys.setprofile(tracer)
 
         return part
 

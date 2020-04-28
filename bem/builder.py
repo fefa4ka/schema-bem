@@ -1,15 +1,23 @@
 import importlib
+import inspect
 import logging
 import os
+from collections import OrderedDict
+from functools import lru_cache
+from inspect import getmro
 from pathlib import Path
 
+from skidl import SKIDL, SPICE, TEMPLATE, Part, SchLib, set_default_tool
+from skidl.tools.spice import set_net_bus_prefixes
+
 from .base import Block as BaseBlock
-from skidl import TEMPLATE
-from inspect import getmro
-from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
-import inspect
+
+
+@lru_cache(maxsize=100)
+def PartCached(library, symbol, dest):
+    return Part(library, symbol, dest=dest)
 
 class Build:
     name = None
@@ -179,8 +187,6 @@ class Build:
 
     @property
     def spice(self):
-        from skidl import SKIDL, SPICE, set_default_tool, SchLib, Part
-        from skidl.tools.spice import set_net_bus_prefixes
 
         set_default_tool(SPICE)
         set_net_bus_prefixes('N', 'B')
@@ -193,4 +199,4 @@ class Build:
         if self.name.find(':') != -1:
             kicad, spice = self.name.split(':')
 
-            return Part(kicad, spice, dest=TEMPLATE)
+            return PartCached(kicad, spice, dest=TEMPLATE)
