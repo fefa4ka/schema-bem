@@ -35,7 +35,20 @@ class Block:
         return value
 
     def __init__(self, *args, **kwargs):
-        self.log(', '.join([key + ' = ' + str(value) for key, value in kwargs.items()]))
+        definition = []
+        mods = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [value])) for key, value in self.mods.items()])
+        props = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [value])) for key, value in self.props.items()])
+        args = ', '.join([key + ' = ' + str(value) for key, value in kwargs.items()])
+        if mods:
+            definition.append('mods: ' + mods)
+
+        if props:
+            definition.append('props: ' + props)
+
+        if args:
+            definition.append(args)
+
+        self.log(' | '.join(definition))
 
         self.scope.append((self.owner[-1], self))
         self.owner.append(self)
@@ -209,7 +222,7 @@ class Block:
         self.owner.pop()
 
         params = self.get_params()
-        self.log(', '.join([key + ' = ' + str(value['value']) + ' ' + value['unit'].get('suffix', '') for key, value in params.items()]))
+        self.log(', '.join([key + ' = ' + str(value['value']) + ' ' + value['unit'].get('suffix', '') for key, value in params.items()]) + '\n')
 
     @property
     def SIMULATION(self):
@@ -242,6 +255,7 @@ class Block:
             doc = '\n'.join([line.strip() for line in doc.split('\n')])
             description.append(doc)
 
+        description.reverse()
         return description
 
     def get_params_description(self):
@@ -468,7 +482,6 @@ class Block:
         return params
 
     def log(self, message, *args):
-        return
         # Get the previous frame in the stack, otherwise it would
         # be this function
         func = inspect.currentframe().f_back.f_code

@@ -57,7 +57,7 @@ class Schematic:
             part_type = part.lib + ':' + part.name
             self.parts[ref] = self.part_data(part)
 
-            symbol = sch_symbol(part.lib, part.name, part.instance.unit)
+            symbol = sch_symbol(part.lib, part.name, part.instance.unit, ref=part.ref, value=part.value)
             self.skin[ref] = symbol
 
 
@@ -185,14 +185,14 @@ class Schematic:
         # Rotate
         if rotation != 0:
             part = self.parts[part_ref]['instance']
-            self.skin[part_ref] = sch_symbol(part.lib, part.name, part.instance.unit, rotation)
+            self.skin[part_ref] = sch_symbol(part.lib, part.name, part.instance.unit, rotation, part_ref, part.value)
 
     def airwire_power(self):
         # Set pin direction for pins connected to VBUS = input, GND = output
         # Airwire all pins connected to VBUS and GND
         # Rotate (TODO: two pin) parts according to power line. For GND pin orientation is bottom, for VBUS is top
 
-        is_two_pin = lambda part: True or part.get('pins_count', 0) == 2
+        is_two_pin = lambda part: part.get('pins_count', 0) <= 3
 
         vcc_processed = []
 
@@ -215,7 +215,7 @@ class Schematic:
                                 self.change_pin_orientation(part_name, pin, 'D')
                                 vcc_processed.append(part_name)
 
-                            part['port_directions'][pin] = 'output'
+                            part['port_directions'][pin] = 'input'
                             self.airwire(part_name, pin, 'GNDPWR')
 
                         else:
@@ -223,19 +223,20 @@ class Schematic:
                                 self.change_pin_orientation(part_name, pin, 'U')
                                 vcc_processed.append(part_name)
 
-                            part['port_directions'][pin] = 'input'
+                            part['port_directions'][pin] = 'output'
                             self.airwire(part_name, pin, 'VBUS')
-
 
         gnd_parts = self.nets.get('0', [])
         for part_name in gnd_parts:
             part = self.parts[part_name]
 
             for pin in gnd_parts[part_name]:
-                part['port_directions'][pin] = 'output'
+                part['port_directions'][pin] = 'input'
                 if is_two_pin(part) and part_name not in vcc_processed:
                     self.change_pin_orientation(part_name, pin, 'D')
+
                 self.airwire(part_name, pin, 'GNDPWR')
+
 
     def net_pin_orientations(self, net, without=None):
         orientations = defaultdict(int)
@@ -290,6 +291,7 @@ class Schematic:
                     # if orientations_first['U'] and orientations_second['D']:
                     # L R in one side and U or D in another - VERTICAL
                     if orientations_first['L'] and orientations_second['R']:
+
                         if orientations_first['R'] and orientations_second['L']:
                             if orientations_first['R'] > orientations_first['L'] > orientations_second['L'] > orientations_second['R']:
                                 self.change_pin_orientation(part_name, pins[0], 'L')
@@ -297,26 +299,42 @@ class Schematic:
                                 self.change_pin_orientation(part_name, pins[0], 'R')
                         else:
                             self.change_pin_orientation(part_name, pins[0], 'R')
+
                     elif orientations_first['R'] and orientations_second['L']:
+
                         self.change_pin_orientation(part_name, pins[0], 'L')
+
                     elif orientations_first['U'] and orientations_second['D']:
+
                         self.change_pin_orientation(part_name, pins[0], 'D')
+
                     elif orientations_first['D'] and orientations_second['U']:
+
                         self.change_pin_orientation(part_name, pins[0], 'U')
-                    elif orientations_first['L'] or orientations_second['R']:
-                        self.change_pin_orientation(part_name, pins[0], 'R')
-                    elif orientations_first['R'] or orientations_second['L']:
-                        self.change_pin_orientation(part_name, pins[0], 'L')
+
                     elif orientations_first['U'] and orientations_second['U']:
+
                         if orientations_first['U'] >= orientations_second['U']:
                             self.change_pin_orientation(part_name, pins[0], 'D')
                         else:
                             self.change_pin_orientation(part_name, pins[0], 'U')
+
                     elif orientations_first['D'] and orientations_second['D']:
+
                         if orientations_first['D'] >= orientations_second['D']:
                             self.change_pin_orientation(part_name, pins[0], 'U')
                         else:
                             self.change_pin_orientation(part_name, pins[0], 'D')
+
+                    elif orientations_first['L'] or orientations_second['R']:
+
+                        self.change_pin_orientation(part_name, pins[0], 'R')
+
+                    elif orientations_first['R'] or orientations_second['L']:
+
+                        self.change_pin_orientation(part_name, pins[0], 'L')
+
+
 #                    elif orientations_first['D'] and orientations_second['D']:
 #                        self.change_pin_orientation(part_name, pins[0], 'R')
 #                    elif orientations_first['R'] and orientations_second['R']:
@@ -366,7 +384,7 @@ class Schematic:
                     self.airwire(ref, pin_num, 'GNDPWR')
                     if port_orientation[pin_num] == 'D':
                         log.info('Rotation 180 ° for GND pin: ' + ref)
-                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
+                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180, ref, part.value)
 
                         return True 
 
@@ -379,7 +397,7 @@ class Schematic:
                     self.change_pin_direction(second_net, 'input', without=ref)
                     if port_orientation[pin_num] == 'U':
                         log.info('Rotation 180 ° for VBUS pin: ' + ref)
-                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180)
+                        self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180, ref, part.value)
 
                         return True
 
@@ -397,34 +415,34 @@ class Schematic:
         self.parts[part.ref]['processed'] = True
 
     def generate_skin_svg(self, filename=''):
-        svg = '<svg xmlns="http://www.w3.org/2000/svg" \
-             xmlns:xlink="http://www.w3.org/1999/xlink" \
-             xmlns:s="https://github.com/nturley/netlistsvg"> \
-                <s:properties \
-                        constants="false" \
-                        splitsAndJoins="false" \
-                        genericsLaterals="true"> \
-                    <s:layoutEngine \
-                        org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers="300" \
-                        org.eclipse.elk.layered.spacing.edgeNodeBetweenLayers="0" \
-                        org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="-500" \
-                        org.eclipse.elk.spacing.nodeNode="0" \
-                        org.eclipse.elk.spacing.edgeEdge="300" \
-                        org.eclipse.elk.spacing.edgeNode="0" \
-                        org.eclipse.elk.layered.nodePlacement.strategy="5" \
-                        org.eclipse.elk.layered.compaction.connectedComponents="true"\
-                        org.eclipse.elk.layered.compaction.postCompaction.constraints="QUADRATIC"\
-                        org.eclipse.elk.layered.compaction.postCompaction.strategy="EDGE_LENGTH"\
-                        org.eclipse.elk.direction="3"/>\
-                </s:properties>\
-                <style>\
-                svg { \
-                    stroke: #000;\
-                    fill: none;\
-                }\
-                </style>'
+        # Warning: Sometimes schematic couldn't be generated with tight spacing
+        svg = """
+            <svg xmlns="http://www.w3.org/2000/svg"
+             xmlns:xlink="http://www.w3.org/1999/xlink"
+             xmlns:s="https://github.com/nturley/netlistsvg">
+                <s:properties
+                        constants="false"
+                        splitsAndJoins="false"
+                        genericsLaterals="true">
+          <s:layoutEngine
+                org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="5"
+                org.eclipse.elk.layered.compaction.postCompaction.strategy="4"
+                org.eclipse.elk.spacing.nodeNode="35"
+                org.eclipse.elk.direction="DOWN"/>
+                </s:properties>
+                <style>
+                svg {
+                    stroke: #000;
+                    fill: none;
+                }
+
+
+                </style>
+        """
+
 
         for key in self.skin.keys():
+            svg += '\n\n<!-- ' + key + '-->'
             svg += self.skin[key]['svg']
 
         svg += '</svg>'
@@ -470,7 +488,6 @@ class Schematic:
                 net = part['connections'][pin]
                 # If pin doesn't exists:
                 if not net:
-                    log.info('Delete %s.%s -> %s', part_name, pin, net)
                     del part['connections'][pin]
 
                 if net:
@@ -505,6 +522,9 @@ class Schematic:
              xmlns:xlink="http://www.w3.org/1999/xlink" \
              xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 %s %s">' % (width, height)
 
+        os.remove('schema.svg')
+        os.remove('netlist.json')
+        os.remove('skin.svg')
 
         return ''.join(svg)
 
@@ -517,14 +537,14 @@ def generate_schematics(circuit):
     return schema.generate()
 
 
-def sch_symbol(library, device, unit=1, rotate=0):
+def sch_symbol(library, device, unit=1, rotate=0, ref='', value=''):
     import string
 
     if type(unit) == str:
         unit = string.ascii_uppercase.index(unit.upper()) + 1
 
-    log.info('%s / %s.%d %d °', library, device, unit, rotate)
-    symbol = json.loads(sch2svg(library, device, unit, rotate))
+    log.info('%s / %s.%d %d ° -> %s (%s)', library, device, unit, rotate, ref, value)
+    symbol = json.loads(sch2svg(library, device, unit, rotate)) #, ref, str(value)))
     port_orientation = symbol['port_orientation']
     orientation = 'N'
     symbol['port_orientation'] = port_orientation

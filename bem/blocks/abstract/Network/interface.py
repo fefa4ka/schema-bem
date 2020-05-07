@@ -59,8 +59,6 @@ class Interfaced(Base):
 
     def interface(self, protocol, instance):
         for pin in getattr(self, protocol.upper()):
-            self_pin = self[pin]
-            instance_pin = instance[pin]
-            self_pin += instance_pin
+            self[pin] & instance[pin]
 
 # cpu.spi & Display --  cpu.spi(Display) cpu.interface(spi, Display.interfaces['spi'])

@@ -7,7 +7,7 @@ from copy import copy
 
 
 class Base(Physical()):
-    def willMount(self, V = 10 @ u_V):
+    def willMount(self, V = 10 @ u_V, wire_gnd=True):
         if type(V) == slice:
             self.V_sweep = V
 
@@ -21,19 +21,24 @@ class Base(Physical()):
 
     def circuit(self, *args, **kwargs):
         self.element = element = self.part(*args, **kwargs)
+
         # Ground problem fix
-        gnd = Net.get('0')
-        if not gnd:
-            gnd = Net('0')
 
-        gnd.fixed_name = True
-        element['-'] & gnd
+        if self.wire_gnd:
+            gnd = Net.get('0')
+            if not gnd:
+                gnd = Net('0')
 
-        # TODO: Probably bad idea, because you could mixing voltage sources
-        self.output.fixed_name = True
+            gnd.fixed_name = True
+            element['-'] & gnd
+
+            # TODO: Probably bad idea, because you could mixing voltage sources
+            self.output.fixed_name = True
+            gnd & self.gnd
 
         self.v_ref & element['+'] & self.output
-        gnd & self.gnd & element['-'] & self.input
+        self.gnd & element['-'] & self.input
+
 
     def __mod__(self, other):
         """Decibels

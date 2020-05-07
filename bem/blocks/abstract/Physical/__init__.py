@@ -11,6 +11,7 @@ import builtins
 
 from functools import lru_cache
 
+
 @lru_cache(maxsize=100)
 def PartCached(library, symbol, footprint, dest):
     return Part(library, symbol, footprint=footprint, dest=dest)
@@ -54,13 +55,26 @@ class Base(Electrical()):
         sys.setprofile(tracer)
 
     def available_parts(self):
+        from statistics import mean
         circuit = builtins.default_circuit
         circuits_units = circuit.units[self.name] if hasattr(circuit, 'units') else []
-        parts = Stockman(self).suitable_parts(circuits_units)
+        stock = Stockman(self)
+        parts = stock.suitable_parts(circuits_units)
 
         if len(parts) == 0:
             self.part_unavailable()
 
+        # TODO: Sort by V, Power, I
+        def cmp_param(part, param):
+            avg = lambda values: mean([abs(float(value)) for value in values]) if len(values) else 0
+            values = stock.get_param(part, param)
+            return avg(values)
+
+        cmp_V = lambda part: cmp_param(part, 'V')
+        cmp_I = lambda part: cmp_param(part, 'I')
+        cmp_P = lambda part: cmp_param(part, 'P')
+
+        parts = sorted(parts, key=lambda x: (cmp_V, cmp_I, cmp_P))
         return parts
 
     def select_part(self):

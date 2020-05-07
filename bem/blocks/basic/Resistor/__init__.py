@@ -12,7 +12,7 @@ import logging
 
 class Base(Combination()):
     """
-    Generic resistance.
+    # Generic resistance
 
     Resistance implemented by combination of series or parallel connected resistors from available values in stock.
 

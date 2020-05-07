@@ -73,8 +73,8 @@ def is_tolerated(a, b, tollerance=0.1):
         return True
 
     try:
-        b = float(b)
-        a = float(a)
+        b = abs(float(b))
+        a = abs(float(a))
         diff = abs(a - b)
         if diff < a * tollerance:
             return True
@@ -192,3 +192,16 @@ def ERC_logger():
     return tail
 
 
+# Cache
+from functools import wraps
+
+def cached(func):
+    func.cache = {}
+    @wraps(func)
+    def wrapper(*args):
+        try:
+            return func.cache[args]
+        except KeyError:
+            func.cache[args] = result = func(*args)
+            return result
+    return wrapper

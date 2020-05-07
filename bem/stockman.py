@@ -27,7 +27,6 @@ class Stockman:
         name = self.block.name
         parts = Part.select().where(Part.block == name)
 
-
         return parts
 
     def suitable_parts(self, parts=[]):
@@ -91,6 +90,14 @@ class Stockman:
 
         return False
 
+    def get_param(self, part, param):
+        values = []
+        part_params = part.params.where(Param.name == param)
+        for part_param in part_params:
+            values.append(part_param.value)
+
+        return values
+
     def check_param(self, part, param, desire):
         part_params = part.params.where(Param.name == param)
         if part_params.count():
@@ -139,6 +146,7 @@ class Stockman:
         return True
 
     def is_value_proper(self, param, desire, value):
+        # TODO: Maybe strict negative value comparation needed
         if param in self.upper_limit:
             return self.is_value_enough(desire, value)
         else:
@@ -151,7 +159,7 @@ class Stockman:
         return False
 
     def is_value_enough(self, desire, value, multiple=1):
-        if u(value) >= u(desire) * multiple:
+        if abs(u(value)) >= abs(u(desire)) * multiple:
             return True
 
         return False

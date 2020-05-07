@@ -16,17 +16,13 @@ const {
     Pcb,
     Lib,
     PinOrientation
-} = require("kicad-utils")
+} = require("./kicad-utils/js/kicad-utils.js")
 
 const DrawPin = Lib.DrawPin
-const DEFAULT_LINE_WIDTH = 6
-const canvas2svg = require('canvas2svg')
-
-const { createCanvas } = require('canvas')
-const canvas = createCanvas(150, 150);
 
 const args = process.argv.slice(2)
-const [library_name, device_name, unit, rotate] = args
+const [library_name, device_name, unit, rotate, ref, value] = args
+
 
 const device = fs.readFileSync('/Library/Application\ Support/kicad/library/' + library_name + '.lib').toString()
 
@@ -34,17 +30,17 @@ const lib = Lib.Library.load(device)
 
 const component = lib.findByName(device_name);
 const rect = component.draw.getBoundingRect();
+if (ref) component.field.reference = ref
+if (value) component.fields[0].name = value
 
+const TEXT_SIZE = 8;
+let scale = 0.2
 
-const PADDING = 500;
-const width = rect.width + PADDING, height = rect.height + PADDING;
+const PADDING = 0
 
-
-const scale = Math.min(canvas.width / width, canvas.height / height);
 
 class SkinPlotter extends SVGPlotter {
     output = ''
-    lineWidth = 1
     startPlot() {
     }
     endPlot() {
@@ -52,19 +48,19 @@ class SkinPlotter extends SVGPlotter {
     startG(props, transform) {
         let tagProps = Object.keys(props).map(prop => `s:${prop}="${props[prop]}"`).join(' ')
 
-        this.output += this.xmlTag `<g ${transform ? 'transform="${transform}"' : ''} ${tagProps}>`
+        this.output += this.xmlTag `\n<g ${transform ? 'transform="${transform}"' : ''} ${tagProps}>`
     }
     endG() {
-        this.output += this.xmlTag `</g>`
+        this.output += this.xmlTag `</g>\n`
     }
 	addTag(tag, props) {
 		let tagProps = Object.keys(props).map(prop => `${prop}="${props[prop]}"`).join(' ')
-		this.output += `<${tag} ${tagProps}/>`
+		this.output += `\n<${tag} ${tagProps}/>\n`
 	}
     g(props, transform) {
         let tagProps = Object.keys(props).map(prop => `s:${prop}="${props[prop]}"`).join(' ')
 
-        this.output += this.xmlTag `<g ${transform ? 'transform="${transform}"' : ''} ${tagProps}/>`
+        this.output += this.xmlTag `\n<g ${transform ? 'transform="${transform}"' : ''} ${tagProps}/>\n`
     }
     value(
 		p,
@@ -79,7 +75,8 @@ class SkinPlotter extends SVGPlotter {
 		bold,
 		multiline
 	) {
-        this.output += this.xmlTag `<text style="font-size:${size}px;" class="nodevalue $cell_id" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" ${text ? '' : 's:attribute="value"'}>${text}</text>`
+
+        this.output += this.xmlTag `\n<text style="font-size:${size}px;" class="nodevalue $cell_id" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" ${text ? '' : 's:attribute="value"'}>${text}</text>\n`
 	}
        label(
 		p,
@@ -94,13 +91,17 @@ class SkinPlotter extends SVGPlotter {
 		bold,
 		multiline
 	) {
-        this.output += this.xmlTag `<text class="nodelabel $cell_id" style="font-size:${size}px;" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" s:attribute="ref">${text}</text>`
+
+        this.output += this.xmlTag `\n<text class="nodelabel $cell_id" style="font-size:${size}px;" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" s:attribute="ref">${text}</text>\n`
 	}
 }
 
 
 class SchSkinPlotter extends SchPlotter {
     plotDrawPin(draw, component, transform) {
+        draw.lineWidth = config.lineWidth 
+        draw.length *= scale
+
         this.plotDrawPinReference(draw, component, transform)
 		if (!draw.visibility) return;
 		this.plotDrawPinTexts(draw, component, transform);
@@ -147,24 +148,22 @@ class SchSkinPlotter extends SchPlotter {
             
             }
 
-            const text = 'Very_Long'
-			let width  = 0//this.plotter.font.computeTextLineSize(text, 14, DEFAULT_LINE_WIDTH);
-			let height = this.plotter.font.getInterline(14, DEFAULT_LINE_WIDTH);
-            let px = width * -1, py = height;
+            const text = 'Very_Long_Name_Block'
+			let width  = 100;// this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
+			let height = 0; //this.plotter.font.getInterline(component.fields[0].textSize * scale / 4, config.lineWidth);
+            let px = width / 2, py = height / 2;
 
             if(orientation != 0) {
                 px = height
-                py = width * -1
+                py = width
             }
-            
-            
             
             this.plotter.label(
                 Point.add({ x: px, y: py}, pos),
                 '',
                 component.field.reference || {},
                 orientation,
-                component.field.textSize,
+                component.field.textSize * scale,
                 '',
                 '',
                 '',
@@ -183,25 +182,25 @@ class SchSkinPlotter extends SchPlotter {
 				}
 			}
 
-            const text = '10 mV'
-			let width  = this.plotter.font.computeTextLineSize(text, 14, DEFAULT_LINE_WIDTH);
-			let height = this.plotter.font.getInterline(14, DEFAULT_LINE_WIDTH);
-            let px = width * -1, py = height;
+            const text = '100 mOhm'
+			let width  = 100;//this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
+			let height = 0;//this.plotter.font.getInterline(component.fields[0].textSize * scale / 4, config.lineWidth);
+            let px = width / 2, py = height / 2;
 
             if(orientation != 0) {
                 px = height
-                py = width * -1
+                py = width
             }
-            
+
 			this.plotter.value(
 				Point.add({ x: px, y: py }, pos),
 			    '',	
 				component.fields[0].reference || '',
 				orientation,
-				component.fields[0].textSize,
+				component.fields[0].textSize * scale,
 				TextHjustify.CENTER,
 				TextVjustify.CENTER,
-				DEFAULT_LINE_WIDTH,
+				config.lineWidth,
 				component.fields[0].italic,
 				component.fields[0].bold
 			);
@@ -210,23 +209,42 @@ class SchSkinPlotter extends SchPlotter {
 
 }
 
-const svgPlotter = new SkinPlotter()
+const config = {
+    lineWidth: 2,
+    lineWidthBus: 4,
+    fill: Fill.NO_FILL,
+    color: Color.BLACK,
+    scale
+}
+
+const svgPlotter = new SkinPlotter(config)
 const schSvgPlotter = new SchSkinPlotter(svgPlotter)
-svgPlotter.lineWidth = 2 
 const type = library_name + ':' + device_name
 
-if(rotate == 0) transform = new Transform(1, 0, 0, -1) // Base
-if(rotate == 90) transform = new Transform(0, 1, -1, 0) // 90
-if(rotate == 180) transform = new Transform(-1, 0, 0, 1) // 180 
-if(rotate == 270 || rotate == -90) transform = new Transform(0, -1, -1, 0) // 270
+
+const width = rect.width * scale + PADDING, height = rect.height * scale + PADDING;
+// 
+// if(rotate == 0) transform = new Transform(1, 0, 0, -1) // Base
+// if(rotate == 90) transform = new Transform(0, 1, -1, 0) // 90
+// if(rotate == 180) transform = new Transform(-1, 0, 0, 1) // 180 
+// if(rotate == 270 || rotate == -90) transform = new Transform(0, -1, 1, 0) // 270
+if(rotate == 0) transform = new Transform(scale, 0, 0, -1 * scale) // Base
+if(rotate == 90) transform = new Transform(0, scale, -1 * scale, 0) // 90
+if(rotate == 180) transform = new Transform(-1 * scale, 0, 0, scale) // 180 
+if(rotate == 270 || rotate == -90) transform = new Transform(0, -1 * scale, 1 * scale, 0) // 270
+// GND
+pos = rect.pos1
+
+transform = transform.translate(pos.x * -1, pos.y) 
+//transform = transform.translate(1 / scale, 0) 
+
 svgPlotter.startPlot()
-svgPlotter.startG({ type, width, height }, '')
+svgPlotter.startG({ type, width: rect.width * scale, height: rect.height * scale }, '')
 svgPlotter.addTag('s:alias', { val: type })
 schSvgPlotter.plotLibComponent(component, parseInt(unit), 1, transform)
 schSvgPlotter.plotLibComponentField(component, parseInt(unit), 1, transform)
 svgPlotter.endG()
 svgPlotter.endPlot()
-
 console.log(JSON.stringify({
 	svg: schSvgPlotter.plotter.output,
     port_orientation: component.draw.objects
@@ -240,5 +258,8 @@ console.log(JSON.stringify({
             return pins
         }, {})
 }))
+
+
+//console.log(schSvgPlotter.plotter.output) //.replace(/\n/g, ''))
 
 

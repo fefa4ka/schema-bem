@@ -68,9 +68,7 @@ class Base(Network(port='one')):
 
         try:
             # trace the function 
-            self.log('circuit')
             self.circuit()
-            self.log('circuit finish')
         finally:
             # disable tracer and replace with old one
             tracer_current = tracer_instances.pop()
