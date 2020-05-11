@@ -1,11 +1,11 @@
 from .. import Base
-from bem import Build, u, u_V, u_Hz, u_V, u_s 
-from lcapy import Vac, pi, f, t, sin, sqrt 
+from bem import Build, u, u_V, u_Hz, u_V, u_s
+from lcapy import Vac, pi, f, t, sin, sqrt
 from sympy import Integer, Float
 from numpy import linspace
 
 class Modificator(Base):
-    def willMount(self, frequency=1 @ u_Hz, dc_offset=0@ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
+    def willMount(self, frequency=1 @ u_Hz, dc_offset=0 @ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
         if type(frequency) == list:
             self.Frequency_range = frequency
 
@@ -22,7 +22,7 @@ class Modificator(Base):
         if self.SIMULATION:
             return super().part(**self.get_spice_arguments())
         else:
-            return super().part(value='~ ' + str(self.V) + ' / ' + str(self.frequency))
+            return super().part(value='~ ' + str(self.V.canonise()) + ' / ' + str(self.frequency.canonise()))
 
     def network(self):
         return Vac(self.amplitude)

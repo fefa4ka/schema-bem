@@ -34,7 +34,7 @@ if (ref) component.field.reference = ref
 if (value) component.fields[0].name = value
 
 const TEXT_SIZE = 8;
-let scale = 0.2
+let scale = 0.3
 
 const PADDING = 0
 
@@ -76,7 +76,14 @@ class SkinPlotter extends SVGPlotter {
 		multiline
 	) {
 
-        this.output += this.xmlTag `\n<text style="font-size:${size}px;" class="nodevalue $cell_id" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" ${text ? '' : 's:attribute="value"'}>${text}</text>\n`
+        const x = orientation === 0 ? p.x : p.y
+        const y = orientation === 0 ? p.y : p.x
+
+        this.output += this.xmlTag `\n<text 
+            style="font-size:${size}px;" 
+            class="nodevalue $cell_id" 
+            transform="rotate(${orientation === 0 ? '0' : '-90'}, ${p.x}, ${p.y})" 
+            x="${p.x}" y="${p.y}" ${text ? '' : 's:attribute="value"'}>${text}</text>\n`
 	}
        label(
 		p,
@@ -92,7 +99,11 @@ class SkinPlotter extends SVGPlotter {
 		multiline
 	) {
 
-        this.output += this.xmlTag `\n<text class="nodelabel $cell_id" style="font-size:${size}px;" transform="rotate(${orientation === 0 ? '0' : '-90'})" x="${orientation === 0 ? p.x : p.y}" y="${orientation === 0 ? p.y : p.x}" s:attribute="ref">${text}</text>\n`
+        const x = orientation === 0 ? p.x : p.y
+        const y = orientation === 0 ? p.y : p.x
+
+
+        this.output += this.xmlTag `\n<text class="nodelabel $cell_id" style="font-size:${size}px;" transform="rotate(${orientation === 0 ? '0' : '-90'}, ${p.x}, ${p.y})" x="${p.x}" y="${p.y}" s:attribute="ref">${text}</text>\n`
 	}
 }
 
@@ -149,7 +160,7 @@ class SchSkinPlotter extends SchPlotter {
             }
 
             const text = 'Very_Long_Name_Block'
-			let width  = 100;// this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
+			let width  = 0;// this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
 			let height = 0; //this.plotter.font.getInterline(component.fields[0].textSize * scale / 4, config.lineWidth);
             let px = width / 2, py = height / 2;
 
@@ -183,7 +194,7 @@ class SchSkinPlotter extends SchPlotter {
 			}
 
             const text = '100 mOhm'
-			let width  = 100;//this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
+			let width  = 0;//this.plotter.font.computeTextLineSize(text, component.fields[0].textSize * scale / 4, config.lineWidth) / 2;
 			let height = 0;//this.plotter.font.getInterline(component.fields[0].textSize * scale / 4, config.lineWidth);
             let px = width / 2, py = height / 2;
 
@@ -210,8 +221,8 @@ class SchSkinPlotter extends SchPlotter {
 }
 
 const config = {
-    lineWidth: 2,
-    lineWidthBus: 4,
+    lineWidth: 1,
+    lineWidthBus: 2,
     fill: Fill.NO_FILL,
     color: Color.BLACK,
     scale

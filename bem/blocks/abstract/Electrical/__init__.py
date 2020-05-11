@@ -2,7 +2,11 @@ from bem import u, Block
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
+from skidl.Net import Net as NetType
 import sys
+import inspect
+import builtins
+
 
 tracer_instances = [None]
 
@@ -45,7 +49,6 @@ class Base(Network(port='one')):
 
         name = self.get_ref()
 
-
         # TODO: Hack for schema-explorer
         self.ref = ref = self.name if name in ['Block', 'Instance'] else name
         ref_index = 1
@@ -60,7 +63,7 @@ class Base(Network(port='one')):
 
         def tracer(frame, event, arg, self=self):
             if event == 'return':
-                self.circuit_locals = frame.f_locals
+                self.circuit_locals = frame
 
         # tracer is activated on next call, return or exception
         sys.setprofile(tracer)
@@ -76,17 +79,37 @@ class Base(Network(port='one')):
 
         values = []
 
-        for key, value in self.circuit_locals.items():
+        for key, value in self.circuit_locals.f_locals.items():
             is_block_has_part = hasattr(value, 'element') and value.element
             is_block = issubclass(value.__class__, Block)
             is_not_refed = value not in values
             if key != 'self' and is_block and is_not_refed:
+                # Search in code
+                code = []
+                try:
+                    code = inspect.getsourcelines(self.circuit_locals.f_code)[0]
+                except OSError:
+                    if builtins.code:
+                        code = builtins.code.split('\n')
+
+                notes = []
+                if len(code):
+                    for index, line in enumerate(code):
+                        line = line.replace(' ', '').strip()
+                        if line.find(key + '=') == 0:
+                            comment_line_start = comment_line_end = index
+                            notes = self.inspect_comment(code, comment_line_start, comment_line_end)
+                            self.log(code[comment_line_start])
+                            self.notes += notes
+                            break
+
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
                 ref = name + '_' + key
 
                 if is_block_has_part:
                     values.append(value)
                     value._part.ref = ref
+                    value._part.notes += notes
 
                 value.ref = ref
 
@@ -100,8 +123,7 @@ class Base(Network(port='one')):
 
         for pad_name in pads.keys():
             for net in getattr(self, pad_name):
-                for pin in net.get_pins():
-                    pin.notes += pad_name + ':' + str(self)
+                self.comment_pins_connections(net, pad_name + ':' + str(self))
 
     def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
         """

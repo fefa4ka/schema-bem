@@ -10,7 +10,8 @@ class Modificator(Base):
         'gnd': True
     }
 
-    def __series__(self, instance):
+    def __series__(self, instance, notes=[]):
+        self.comment_pins_connections([self.output, instance.input, self.output_n, instance.input_n], notes)
         if self.output and instance.input:
             self.output += instance.input
 
@@ -19,7 +20,8 @@ class Modificator(Base):
 
         self.connect_power_bus(instance)
 
-    def __parallel__(self, instance):
+    def __parallel__(self, instance, notes=[]):
+        self.comment_pins_connections([self.input, self.output, instance.input, instance.output, self.input_n, self.output_n, instance.input_n, instance.output_n], notes)
         self.input += instance.input
         self.input_n += instance.input_n
 

@@ -3,7 +3,6 @@ from skidl import Circuit, set_default_tool, KICAD, set_backup_lib
 from bem.abstract import Physical
 import builtins
 from collections import defaultdict
-from bem.schema import generate_schematics
 
 class Print:
     block = None
@@ -39,7 +38,6 @@ class Print:
 
         self.scheme.ERC()
 
-        return generate_schematics(self.scheme)
         return self.scheme.generate_netlist()
 
     @classmethod

@@ -9,13 +9,17 @@ class Modificator(Base):
     }
 
     # Link Routines
-    def __series__(self, instance):
+    def __series__(self, instance, notes=[]):
         if hasattr(self, 'output') and hasattr(instance, 'input'):
+            self.comment_pins_connections([instance.input, self.output], notes)
+
             self.output += instance.input
 
         self.connect_power_bus(instance)
 
-    def __parallel__(self, instance):
+    def __parallel__(self, instance, notes=[]):
+        self.comment_pins_connections([self.input, self.output, instance.input, instance.output], notes)
+
         self.input += instance.input
 
         self.output += instance.output

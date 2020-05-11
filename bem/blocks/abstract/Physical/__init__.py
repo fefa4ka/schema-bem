@@ -117,7 +117,7 @@ class Base(Electrical()):
             self._part = part.instance._part
             self.unit = part.unit
 
-            part.instance.element.ref += ref 
+            part.instance.element.ref += ref
 
             builtins.default_circuit.units[self.name].remove(part)
 
@@ -128,6 +128,7 @@ class Base(Electrical()):
                 free_unit_part = copy(part)
                 free_unit_part.unit = free_unit
                 builtins.default_circuit.units[self.name].append(free_unit_part)
+
 
     # Physical or Spice Part
     def part_template(self):
@@ -192,6 +193,7 @@ class Base(Electrical()):
                 part.set_pin_alias('-', 2)
 
             self._part = part
+            self._part.notes += self.notes
 
         part = self._part
         ref = self.ref or self.get_ref()

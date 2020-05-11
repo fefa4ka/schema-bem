@@ -61,69 +61,7 @@ class Block:
         ref = None
         while ref == None:
             frame = sys._getframe(deph)
-            frame_locals = frame.f_locals
-
-            local_self = frame_locals.get('self', None)
-            if local_self != self:
-                ref = frame_locals
-                for key, value in frame_locals.items():
-                    if type(self) == type(value) and self == value:
-                        ref = key
-                        break
-
-                try:
-                    code = inspect.getsourcelines(frame.f_code)[0]
-                except OSError:
-                    # If code runned from shell
-                    self.context = {
-                        'caller': None,
-                        'code': ''
-                    }
-                    break
-
-                code_line = frame.f_lineno - frame.f_code.co_firstlineno
-
-                self.context = {
-                    'caller': frame_locals.get('self', None),
-                    'code': code[code_line]
-                }
-
-                parentheses_open_pos = self.context['code'].find('(')
-                parentheses_close_pos = self.context['code'].find(')')
-
-                # In code there aren't method call, lookup code for local variable
-                code_part = [line.replace(' ', '') for line in code[0:code_line]]
-                code_part.reverse()
-
-                if parentheses_open_pos == -1 or (parentheses_open_pos > parentheses_close_pos):
-                    local_vars = frame.f_code.co_varnames[1:]
-
-                    for line in code_part:
-                        parentheses_open_pos = line.find('(')
-                        parentheses_close_pos = line.find(')')
-
-                        # Block constructed from local method
-                        if line.find('return') == 0:
-                            ref = None
-                            break
-
-                        # Block assigned as local variable
-                        for var in local_vars:
-                            if var + '=' in line:
-                                self.context['code'] = line
-                                break
-                        else:
-                            continue
-
-                        break
-                    else:
-                        self.context['code'] = ''
-                elif self.context['code'].find('=') == -1 or self.context['code'].find('return') != -1:
-                    for line in code_part:
-                        if line.find('def') == 0:
-                            self.context['code'] = line[3:line.find('(')] + '=()'
-                            break
-
+            ref = self.inspect_code(frame)
             deph += 1
 
         arguments = self.parse_arguments(kwargs)
@@ -148,6 +86,118 @@ class Block:
             elif isinstance(kwargs.get(arg, None), FunctionType):
                 value = kwargs[arg](self)
                 setattr(self, arg, value)
+
+
+    def inspect_code(self, frame):
+        ref = None
+        frame_locals = frame.f_locals
+
+        local_self = frame_locals.get('self', None)
+
+        if local_self != self:
+            ref = frame_locals
+            for key, value in frame_locals.items():
+                if type(self) == type(value) and self == value:
+                    ref = key
+                    break
+
+            try:
+                code = inspect.getsourcelines(frame.f_code)[0]
+                code_line = frame.f_lineno - frame.f_code.co_firstlineno
+            except OSError:
+                # If code runned from shell
+                # maybe code available global
+                self.context = {
+                    'caller': None,
+                    'code': builtins.code or ''
+                }
+
+                if not builtins.code:
+                    return ref
+
+                code = builtins.code.split('\n')
+                code_line = frame.f_lineno - 1
+
+            self.context = {
+                'caller': frame_locals.get('self', None),
+                'code': code[code_line]
+            }
+
+            comment_line_start = comment_line_end = code_line
+
+            parentheses_open_pos = self.context['code'].find('(')
+            parentheses_close_pos = self.context['code'].find(')')
+
+            # In code there aren't method call, lookup code for local variable
+            code_part = [line.replace(' ', '') for line in code[0:code_line]]
+            code_part.reverse()
+
+            if parentheses_open_pos == -1 or (parentheses_open_pos > parentheses_close_pos):
+                local_vars = frame.f_code.co_varnames[1:]
+
+                for index, line in enumerate(code_part):
+                    parentheses_open_pos = line.find('(')
+                    parentheses_close_pos = line.find(')')
+
+                    # Block constructed from local method
+                    if line.find('return') == 0:
+                        ref = None
+                        break
+
+                    # Block assigned as local variable
+                    for var in local_vars:
+                        if var + '=' in line:
+                            self.context['code'] = line
+                            comment_line_start = code_line - index
+
+                            break
+                    else:
+                        continue
+
+                    break
+                else:
+                    self.context['code'] = ''
+            elif self.context['code'].find('=') == -1 or self.context['code'].find('return') != -1:
+                for index, line in enumerate(code_part):
+                    if line.find('def') == 0:
+                        comment_line_start = code_line - index
+                        self.context['code'] = line[3:line.find('(')] + '=()'
+                        break
+
+            self.notes = self.inspect_comment(code, comment_line_start, comment_line_end)
+
+        return ref
+
+
+    def inspect_comment(self, code, start, end):
+        notes = []
+
+        if start > 0 and code[start - 1].strip() == '"""':
+            new_end = start
+            start -= 1
+            while start > 0 and code[start - 1].strip() != '"""':
+                start -=1
+
+            for line_number in range(start, new_end - 1):
+                line = code[line_number]
+                notes.append(line)
+
+            start = new_end
+
+        while start > 0 and code[start - 1].strip().find('#') == 0:
+            start -= 1
+
+        for line_number in range(start, end + 1):
+            line = code[line_number]
+            has_comment = line.find('#')
+            if has_comment != -1:
+                comment = line[has_comment + 1:].strip()
+                if comment:
+                    notes.append(comment)
+
+        notes.reverse()
+
+        return notes
 
     @classmethod
     def created(cls, block_type=None):

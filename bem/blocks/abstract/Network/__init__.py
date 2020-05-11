@@ -1,6 +1,8 @@
 from bem import Block, Net, Build, u_V, u_s
 from sympy import Integer
 import inspect
+import sys
+import builtins
 from skidl import Bus
 from skidl.Net import Net as NetType
 from skidl.NetPinList import NetPinList
@@ -39,22 +41,56 @@ class Base(Block):
     def create_network(self):
         return [self.input, self.output]
 
-    def __and__(self, instance):
+    def trace_call_comment(self):
+        frame = sys._getframe(2)
+        # Search in code
+        code = []
+        try:
+            code = inspect.getsourcelines(frame.f_code)[0]
+            code_line = frame.f_lineno - frame.f_code.co_firstlineno
+        except OSError:
+            if builtins.code:
+                code = builtins.code.split('\n')
+                code_line = frame.f_lineno - 1
+
+        notes = self.inspect_comment(code, code_line, code_line)
+
+        return notes
+
+    def comment_pins_connections(self, nets_or_pins, notes):
+        if len(notes) == 0:
+            return
+
+        if type(nets_or_pins) != list:
+            nets_or_pins = [nets_or_pins]
+
+        for net_or_pin in nets_or_pins:
+            if type(net_or_pin) is NetType:
+                for pin in net_or_pin.get_pins():
+                    pin.notes += notes
+            else:
+                net_or_pin.nots += notes
+
+    def __and__(self, instance, notes=[]):
+        if len(notes) == 0:
+            notes = self.trace_call_comment()
+
         if issubclass(type(instance), Block):
-            self.__series__(instance)
+            self.__series__(instance, notes)
 
             return instance
         elif type(instance) == NetPinList:
-            self.__and__(instance[0])
+            self.__and__(instance[0], notes)
 
             return instance
         elif type(instance) == list:
             for block in instance:
-                super().__and__(block)
+                self.__and__(block, notes)
 
             return instance
         else:
-            self.output += instance[0]
+            self.comment_pins_connections([self.output, instance[0]], notes)
+            self.output & instance[0]
 
             return instance
 
@@ -81,39 +117,47 @@ class Base(Block):
     __iadd__ = connect
     """
 
-    def __rand__(self, instance):
+    def __rand__(self, instance, notes=[]):
+        if len(notes) == 0:
+            notes = self.trace_call_comment()
+
         if issubclass(type(instance), Block):
-            instance.__series__(self)
+            instance.__series__(self, notes)
 
             return self
         elif type(instance) == NetPinList:
-            self.__rand__(instance[0])
+            self.__rand__(instance[0], notes)
 
             return self
         elif type(instance) == list:
             for block in instance:
-                super().__rand__(block)
+                self.__rand__(block, notes)
 
             return self
         else:
-            self.input += instance[0]
+            self.comment_pins_connections([self.input, instance[0]], notes)
+            self.input & instance[0]
 
             return self
 
         raise Exception
 
 
-    def __or__(self, instance):
+    def __or__(self, instance, notes=[]):
+        if len(notes) == 0:
+            notes = self.trace_call_comment()
+
         # print(f'{self.title} parallel connect {instance.title if hasattr(instance, "title") else instance.name}')
         if issubclass(type(instance), Block):
-            self.__parallel__(instance)
+            self.__parallel__(instance, notes)
 
             return self # NetPinList([self, instance])
         elif type(instance) == NetPinList:
-            return self.__and__(instance[0])
+            return self.__and__(instance[0], notes)
         else:
-            self.input += instance[0]
-            self.output += instance[-1]
+            self.comment_pins_connections([self.input, self.output, instance[0], instance[1]], notes)
+            self.input & instance[0]
+            self.output & instance[-1]
 
             return self
 
@@ -124,10 +168,10 @@ class Base(Block):
             self.gnd += instance.gnd
 
         if self.v_ref and instance.v_ref:
-            self.v_ref += instance.v_ref
+            self.v_ref & instance.v_ref
 
         if hasattr(self, 'v_inv') and hasattr(instance, 'v_inv'):
-            self.v_inv += instance.v_inv
+            self.v_inv & instance.v_inv
 
 
     # Pins

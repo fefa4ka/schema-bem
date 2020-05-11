@@ -34,6 +34,7 @@ class Schematic:
         self.skin = {}
         self.parts = {}
         self.nets = {}
+        self.airwire_nets = defaultdict(lambda: defaultdict(list))
         self.schema = circuit
         self.hierarchy = Block.hierarchy()
         self.blocks = Block.created()
@@ -48,7 +49,7 @@ class Schematic:
             self.nets[net.name] = self.net_connections(net)
 
         # Add basic parts: VCC, GND, LINE
-        for lib, device in [('power', 'GNDPWR'), ('power', 'VBUS'), ('power', 'LINE')]:
+        for lib, device in [('power', 'GNDREF'), ('power', 'GNDA'), ('power', 'VBUS'), ('power', 'LINE')]:
             part = lib + ':' + device
             self.skin[part] = sch_symbol(lib, device)
 
@@ -82,7 +83,7 @@ class Schematic:
             'ref': part.ref,
             'type': part.ref, #symbol,
             'name': part.name,
-            'description': [entry.strip() for entry in part.description.split(',')],
+            'description': [entry.strip() for entry in part.description.split(',')] + part.notes,
             'attributes': {
                 'value': str(value)
             },
@@ -91,6 +92,8 @@ class Schematic:
             'port_description': {},
             'instance': part
         }
+
+        instance['description'].reverse()
 
         for pin in part.get_pins():
             # TODO: Why here duplicated nets in pin.nets?
@@ -119,6 +122,8 @@ class Schematic:
 
         self.nets[ref] = { part_name: [pin], ref: ['1'] }
         self.nets[current_net][part_name].remove(pin)
+        self.airwire_nets[current_net][ref] = ['1']
+        self.airwire_nets[current_net][part_name].append(pin)
 
         airwire_orientation = 'output' if line_type in ['LINE', 'VBUS'] else 'input'
         airwire = {
@@ -126,7 +131,7 @@ class Schematic:
             'ref': ref,
             'type': 'power:' + line_type,
             'attributes': {
-                'value': str(current_net)
+                'value': '' if current_net == '0' else str(current_net)
             },
             'connections': {
                 '1': ref
@@ -216,7 +221,7 @@ class Schematic:
                                 vcc_processed.append(part_name)
 
                             part['port_directions'][pin] = 'input'
-                            self.airwire(part_name, pin, 'GNDPWR')
+                            self.airwire(part_name, pin, 'GNDA')
 
                         else:
                             if is_two_pin(part):
@@ -235,7 +240,7 @@ class Schematic:
                 if is_two_pin(part) and part_name not in vcc_processed:
                     self.change_pin_orientation(part_name, pin, 'D')
 
-                self.airwire(part_name, pin, 'GNDPWR')
+                self.airwire(part_name, pin, 'GNDREF')
 
 
     def net_pin_orientations(self, net, without=None):
@@ -381,7 +386,7 @@ class Schematic:
                 is_gnd = net == '0'
 
                 if is_gnd:
-                    self.airwire(ref, pin_num, 'GNDPWR')
+                    self.airwire(ref, pin_num, 'GNDREF')
                     if port_orientation[pin_num] == 'D':
                         log.info('Rotation 180 ° for GND pin: ' + ref)
                         self.skin[ref] = sch_symbol(part.lib, part.name, part.instance.unit, 180, ref, part.value)
@@ -426,8 +431,10 @@ class Schematic:
                         genericsLaterals="true">
           <s:layoutEngine
                 org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers="5"
+                org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers="35"
                 org.eclipse.elk.layered.compaction.postCompaction.strategy="4"
                 org.eclipse.elk.spacing.nodeNode="35"
+                org.eclipse.elk.spacing.edgeEdge="20"
                 org.eclipse.elk.direction="DOWN"/>
                 </s:properties>
                 <style>
@@ -498,6 +505,8 @@ class Schematic:
         # If part doesn't have enought pins, create airwires
         self.airwire_power()
         self.horizontal()
+
+        # airwire big parts
 
         ranked_parts = self.most_connected_parts()
         for part, pins in ranked_parts:
