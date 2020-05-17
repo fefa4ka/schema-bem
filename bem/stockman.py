@@ -16,6 +16,18 @@ class Stockman:
              'Z': block.Z
         }
 
+        """
+        load = {}
+
+        params = block.get_params()
+        args = block.get_arguments()
+        keys = { **params, **args }
+        for param in keys:
+            if param not in ['units', 'unit', 'model', 'Load']:
+                continue
+
+            load[param] = keys[param]['value']
+        """
         self.upper_limit = load.keys()
 
         params = list(block.props.keys()) + list(block.mods.keys()) + list(load.keys())

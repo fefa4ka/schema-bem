@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import logging
+import pathlib
 import os
 from collections import OrderedDict
 from functools import lru_cache
@@ -57,7 +58,7 @@ class Build:
                     self.mods[mod] = value
                 else:
                     if type(value) == str:
-                        value = value.split(',') 
+                        value = value.split(',')
                     else:
                         value = [value]
 
@@ -68,6 +69,10 @@ class Build:
             classes = [cls for cls in classes if 'builder' not in str(cls)]
             classes.reverse()
 
+            # TODO: How pass default mods
+            # If block have inherited, than setted mods used for that 
+            # class Base(Network():
+            #   mods = { 'port': 'many' }
             for base in classes:
                 if hasattr(base, 'mods'):
                     for mod, value in base.mods.items():
@@ -110,8 +115,6 @@ class Build:
                 self.files += list(self.base.files)
         else:
             self.props = kwargs
-
-
 
 
     # Run once

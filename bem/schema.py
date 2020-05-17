@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from subprocess import PIPE, run
 
-from skidl import Part
+from skidl import Part, Net
 
 from bem import Block
 
@@ -29,13 +29,14 @@ YOSYS = tool_name = 'schema'
 lib_suffix = '_schema.py'
 
 class Schematic:
-    def __init__(self, circuit):
+    def __init__(self, circuit, Instance=None):
         self.pages = []
         self.skin = {}
         self.parts = {}
-        self.nets = {}
+        self.nets = defaultdict(lambda: defaultdict(list))
         self.airwire_nets = defaultdict(lambda: defaultdict(list))
         self.schema = circuit
+        self.block = Instance
         self.hierarchy = Block.hierarchy()
         self.blocks = Block.created()
         self.parts = Block.created(Part)
@@ -45,8 +46,9 @@ class Schematic:
 
         for code, net in enumerate(
                 sorted(self.schema.get_nets(), key=lambda net: str(net.name))):
-            net.code = code
             self.nets[net.name] = self.net_connections(net)
+        self.ports = {}
+
 
         # Add basic parts: VCC, GND, LINE
         for lib, device in [('power', 'GNDREF'), ('power', 'GNDA'), ('power', 'VBUS'), ('power', 'LINE')]:
@@ -61,6 +63,37 @@ class Schematic:
             symbol = sch_symbol(part.lib, part.name, part.instance.unit, ref=part.ref, value=part.value)
             self.skin[ref] = symbol
 
+
+    def get_ports(self):
+        ports = {}
+
+        nets = sorted(list(self.nets.keys()))
+        if self.block and len(nets):
+            circuit_name = self.block.name
+            ports = {}
+
+            for pin in self.block.get_pins():
+                net = getattr(self.block, pin)
+                # Net maybe doesn't connect to anything
+                if not len(net.get_pins()):
+                    continue
+                direction = None
+                if pin.find('output') == 0:
+                    direction = 'output'
+
+                if pin.find('input') == 0:
+                    direction = 'input'
+
+                if not direction:
+                    continue
+
+                ports[pin] = {
+                    'direction': direction,
+                    'bits': [nets.index(net.name)],
+                    'net': net.name
+                }
+
+        return ports
 
     def net_connections(self, net):
         parts = defaultdict(list)
@@ -90,6 +123,7 @@ class Schematic:
             'connections': {},
             'port_directions': {},
             'port_description': {},
+            'footprint': part.footprint,
             'instance': part
         }
 
@@ -114,18 +148,31 @@ class Schematic:
         return instance
 
     def airwire(self, part_name, pin, line_type='LINE'):
+        if type(pin) is list:
+            pins = pin
+        else:
+            pins = [pin]
+
         part = self.parts[part_name]
-        current_net = part['connections'][pin]
-        ref = '_'.join([current_net, part_name, pin])
-
-        log.info('[%s] <- %s.%s [%s]', line_type, part_name, pin, current_net)
-
-        self.nets[ref] = { part_name: [pin], ref: ['1'] }
-        self.nets[current_net][part_name].remove(pin)
-        self.airwire_nets[current_net][ref] = ['1']
-        self.airwire_nets[current_net][part_name].append(pin)
-
         airwire_orientation = 'output' if line_type in ['LINE', 'VBUS'] else 'input'
+
+        for pin in pins:
+            current_net = part['connections'][pin]
+            ref = '_'.join([current_net, part_name])
+
+            log.info('[%s] <- %s.%s [%s] over net %s', line_type, part_name, pin, current_net, ref)
+
+            self.nets[ref][part_name].append(pin)
+            self.nets[ref][ref] = ['1']
+
+            self.nets[current_net][part_name].remove(pin)
+
+            self.airwire_nets[current_net][ref] = ['1']
+            self.airwire_nets[current_net][part_name].append(pin)
+
+            part['port_directions'][pin] = 'input' if airwire_orientation == 'output' else 'output'
+            part['connections'][pin] = ref
+
         airwire = {
             'processed': True,
             'ref': ref,
@@ -141,10 +188,10 @@ class Schematic:
             },
             'pin_count': 1
         }
+        self.skin[ref] = sch_symbol('power', 'LINE')
 
-        part['port_directions'][pin] = 'input' if airwire_orientation == 'output' else 'output'
-        part['connections'][pin] = ref
         self.parts[ref] = airwire
+
 
     def change_pin_direction(self, net, direction, without=None):
         for part_name in self.nets[net].keys():
@@ -189,8 +236,62 @@ class Schematic:
         log.info('%s.%s %s -> %s %d °', part_ref, pin, current_orientation, orientation, rotation)
         # Rotate
         if rotation != 0:
-            part = self.parts[part_ref]['instance']
+            part = self.parts[part_ref].get('instance', None)
             self.skin[part_ref] = sch_symbol(part.lib, part.name, part.instance.unit, rotation, part_ref, part.value)
+
+    def connect_line(self, direction, net):
+        ref = net + '_Ref'
+        if direction == 'v_inv':
+            line_type = 'GNDA'
+            orientation = 0
+            airwire_direction = 'input'
+        else:
+            line_type = 'LINE' if direction == 'output' else 'LINE'
+            orientation = '-90' if direction == 'output' else '90'
+            airwire_direction = 'output' if direction == 'input' else 'input'
+
+        airwire = {
+            'processed': True,
+            'ref': ref,
+            'type': ref,
+            'attributes': {
+                'value': net,
+            },
+            'connections': {
+                '1': net
+            },
+            'port_directions': {
+                '1': airwire_direction
+            },
+            'pin_count': 1
+        }
+
+        self.nets[net][ref] = ['1']
+        self.parts[ref] = airwire
+
+        self.skin[ref] = sch_symbol('power', line_type, rotate=orientation)
+        symbol = self.skin[ref]
+        symbol['svg'] = symbol['svg'].replace('power:' + line_type, ref)
+        self.skin[ref]['svg'] = symbol['svg']
+
+    def airwire_io(self):
+        nets = list(self.nets.keys())
+        for net in nets:
+            is_input = net.find('InputLine') == 0
+            is_output = net.find('OutputLine') == 0
+            is_vinv = net.find('VInvLine') == 0
+
+            if is_input:
+                self.connect_line('input', net)
+                # add airwire LINE with pin to right
+
+            if is_output:
+                self.connect_line('output', net)
+                # add airwire LINE with pin to left
+
+            if is_vinv:
+                self.connect_line('v_inv', net)
+
 
     def airwire_power(self):
         # Set pin direction for pins connected to VBUS = input, GND = output
@@ -208,7 +309,9 @@ class Schematic:
                 vs_parts = self.nets[net]
                 for part_name in vs_parts:
                     part = self.parts[part_name]
-                    for pin in vs_parts[part_name]:
+                    pins = vs_parts[part_name]
+                    log.info(part_name + ' - ' + str(pins))
+                    for pin in pins:
                         log.info('%s[%d]: %s', part_name, part.get('pins_count', 0), str(part['connections']))
 
                         # Maybe some unit doesn't present (for example VCC and GND for OpAmp)
@@ -221,6 +324,7 @@ class Schematic:
                                 vcc_processed.append(part_name)
 
                             part['port_directions'][pin] = 'input'
+                            airwire_type = 'GNDA'
                             self.airwire(part_name, pin, 'GNDA')
 
                         else:
@@ -235,12 +339,13 @@ class Schematic:
         for part_name in gnd_parts:
             part = self.parts[part_name]
 
-            for pin in gnd_parts[part_name]:
+            pins = list(gnd_parts[part_name])
+            for pin in pins:
                 part['port_directions'][pin] = 'input'
                 if is_two_pin(part) and part_name not in vcc_processed:
                     self.change_pin_orientation(part_name, pin, 'D')
 
-                self.airwire(part_name, pin, 'GNDREF')
+            self.airwire(part_name, pins, 'GNDREF')
 
 
     def net_pin_orientations(self, net, without=None):
@@ -283,16 +388,41 @@ class Schematic:
                 # Orient pin to side of connected part 
                 for pin in pins:
                     if is_power(part, pin):
+                        log.info('%s if power connected' % part_name)
                         break
                 else:
                     # Get sides of connected pins
                     # Choise most often side and make opposite
                     first_net = part['connections'][pins[0]]
                     second_net = part['connections'][pins[1]]
+
+                    is_port_connected = False
+
+                    # TODO: If there are ports, orient properly to port direction
+                    # for port in self.ports:
+                    #     port = self.ports[port]
+
+                    #     orientation = 'R' if port['direction'] == 'input' else 'L'
+                    #     if port['net'] == first_net:
+                    #         self.change_pin_orientation(part_name, pins[0], orientation)
+                    #         is_port_connected = port
+                    #         break
+
+                    #     if port['net'] == second_net:
+                    #         self.change_pin_orientation(part_name, pins[1], orientation)
+                    #         is_port_connected = port
+                    #         break
+
+
                     orientations_first = self.net_pin_orientations(first_net, part_name)
                     orientations_second = self.net_pin_orientations(second_net, part_name)
 
                     log.info('%s %s - %s - %s %s', str(dict(orientations_first)), first_net, part_name, second_net, str(dict(orientations_second)))
+
+                    if is_port_connected:
+                        log.info('Port %s [%s] connected to %s ' % (port['net'], port['direction'], orientation))
+                        continue
+
                     # if orientations_first['U'] and orientations_second['D']:
                     # L R in one side and U or D in another - VERTICAL
                     if orientations_first['L'] and orientations_second['R']:
@@ -398,7 +528,7 @@ class Schematic:
                     self.airwire(ref, pin_num, 'VBUS')
 
                     # Opposit pin directions is input
-                    self.parts[ref]['port_directions'][pin_num] = 'output' 
+                    self.parts[ref]['port_directions'][pin_num] = 'output'
                     self.change_pin_direction(second_net, 'input', without=ref)
                     if port_orientation[pin_num] == 'U':
                         log.info('Rotation 180 ° for VBUS pin: ' + ref)
@@ -437,16 +567,52 @@ class Schematic:
                 org.eclipse.elk.spacing.edgeEdge="20"
                 org.eclipse.elk.direction="DOWN"/>
                 </s:properties>
-                <style>
-                svg {
-                    stroke: #000;
-                    fill: none;
-                }
-
-
-                </style>
         """
 
+        signal = """
+        <!-- signal -->
+        <g s:type="inputExt" s:width="30" s:height="20">
+          <text x="15" y="-4" class="$cell_id" s:attribute="ref">input</text>
+          <s:alias val="$_inputExt_"/>
+          <path d="M0,0 V20 H15 L30,10 15,0 Z" class="$cell_id"/>
+          <g s:x="30" s:y="10" s:pid="Y" s:position="right"/>
+        </g>
+
+        <g s:type="outputExt" s:width="30" s:height="20" transform="translate(60,70)">
+          <text x="15" y="-4" class="$cell_id" s:attribute="ref">output</text>
+          <s:alias val="$_outputExt_"/>
+          <path d="M30,0 V20 H15 L0,10 15,0 Z" class="$cell_id"/>
+          <g s:x="0" s:y="10" s:pid="A" s:position="left"/>
+        </g>
+        <!-- signal -->
+        """
+        generic = """
+        <!-- builtin -->
+        <g s:type="generic" s:width="30" s:height="40">
+          <text x="15" y="-4" class="nodelabel $cell_id" s:attribute="ref">generic</text>
+          <rect width="30" height="40" x="0" y="0" s:generic="body" class="$cell_id"/>
+          <g transform="translate(30,10)"
+             s:x="30" s:y="10" s:pid="out0" s:position="right">
+            <text x="5" y="-4" class="$cell_id">out0</text>
+          </g>
+          <g transform="translate(30,30)"
+             s:x="30" s:y="30" s:pid="out1" s:position="right">
+            <text x="5" y="-4" class="$cell_id">out1</text>
+          </g>
+          <g transform="translate(0,10)"
+             s:x="0" s:y="10" s:pid="in0" s:position="left">
+              <text x="-3" y="-4" class="inputPortLabel $cell_id">in0</text>
+          </g>
+          <g transform="translate(0,30)"
+             s:x="0" s:y="30" s:pid="in1" s:position="left">
+            <text x="-3" y="-4" class="inputPortLabel $cell_id">in1</text>
+          </g>
+        </g>
+        <!-- builtin -->
+        """
+
+        svg += signal
+        svg += generic
 
         for key in self.skin.keys():
             svg += '\n\n<!-- ' + key + '-->'
@@ -467,8 +633,19 @@ class Schematic:
         self.convert_nets()
 
         netlist = open('netlist.json', 'w')
+
+
+        # TODO: Refactoring
+        circuit_name = 'circuit'
+
+
         result = {
-            'modules': { 'test': { 'cells': self.parts } }
+            'modules': {
+                circuit_name: {
+                    'ports': self.ports,
+                    'cells': self.parts
+                }
+            }
         }
         netlist.write(json.dumps(result, indent=4))
         netlist.close()
@@ -503,7 +680,11 @@ class Schematic:
 
     def generate(self):
         # If part doesn't have enought pins, create airwires
+
         self.airwire_power()
+        self.airwire_io()
+
+        self.ports = self.get_ports()
         self.horizontal()
 
         # airwire big parts
@@ -520,22 +701,31 @@ class Schematic:
         module_path = Path(os.path.dirname(__file__)) / 'printer'
         command = ['netlistsvg', 'netlist.json', '--skin', 'skin.svg', '-o', 'schema.svg']
         result = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+        failed = False
 
-        svg_file = open('schema.svg', 'r')
-        svg = svg_file.readlines()
-        svg_file.close()
+        try:
+            svg_file = open('schema.svg', 'r')
+            svg = svg_file.readlines()
+            svg_file.close()
 
-        width = re.findall("<svg(?:\D+=\"\S*\")*\s+width=\"(\d*\.\d+|\d+)\"", svg[0])[0]
-        height = re.findall("<svg(?:\D+=\"\S*\")*\s+height=\"(\d*\.\d+|\d+)\"", svg[0])[0]
-        svg[0] = '<svg xmlns="http://www.w3.org/2000/svg" \
-             xmlns:xlink="http://www.w3.org/1999/xlink" \
-             xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 %s %s">' % (width, height)
+            width = re.findall("<svg(?:\D+=\"\S*\")*\s+width=\"(\d*\.\d+|\d+)\"", svg[0])[0]
+            height = re.findall("<svg(?:\D+=\"\S*\")*\s+height=\"(\d*\.\d+|\d+)\"", svg[0])[0]
+            svg[0] = '<svg xmlns="http://www.w3.org/2000/svg" \
+                 xmlns:xlink="http://www.w3.org/1999/xlink" \
+                 xmlns:s="https://github.com/nturley/netlistsvg" viewBox="0 0 %s %s">' % (width, height)
+        except:
+            failed = True
 
-        os.remove('schema.svg')
-        os.remove('netlist.json')
-        os.remove('skin.svg')
 
-        return ''.join(svg)
+        if not failed:
+            os.remove('schema.svg')
+            os.remove('netlist.json')
+            os.remove('skin.svg')
+
+        if not failed:
+            return ''.join(svg)
+
+        return '{ "error": "Schematic generation failed" }'
 
 
 def generate_schematics(circuit):
@@ -552,7 +742,7 @@ def sch_symbol(library, device, unit=1, rotate=0, ref='', value=''):
     if type(unit) == str:
         unit = string.ascii_uppercase.index(unit.upper()) + 1
 
-    log.info('%s / %s.%d %d ° -> %s (%s)', library, device, unit, rotate, ref, value)
+    log.info('%s / %s.%d %s ° -> %s (%s)', library, device, unit, rotate, ref, value)
     symbol = json.loads(sch2svg(library, device, unit, rotate)) #, ref, str(value)))
     port_orientation = symbol['port_orientation']
     orientation = 'N'

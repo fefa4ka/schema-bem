@@ -36,9 +36,13 @@ class Base(Physical()):
             self.output.fixed_name = True
             gnd & self.gnd
 
+
         self.v_ref & element['+'] & self.output
         self.gnd & element['-'] & self.input
 
+    def finish(self):
+        super().finish()
+        self.v_ref.fixed_name = True
 
     def __mod__(self, other):
         """Decibels

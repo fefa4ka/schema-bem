@@ -18,7 +18,7 @@ class Base(Combination()):
 
     ```
     vs = VS(flow='SINEV')(V=5, frequency=120)
-    load = Resistor()(1000)
+    load = Example()
 
     vs & load & vs
 
@@ -44,7 +44,6 @@ class Base(Combination()):
 
     def part_spice(self, *args, **kwargs):
         return Build('R').spice(*args, **kwargs)
-
 
     # Lcapy experimental
     def network(self):

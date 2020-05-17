@@ -13,16 +13,15 @@ class Modificator(Base):
         if hasattr(self, 'output') and hasattr(instance, 'input'):
             self.comment_pins_connections([instance.input, self.output], notes)
 
-            self.output += instance.input
+            self.connect_priority_net(self.output, instance.input)
 
         self.connect_power_bus(instance)
 
     def __parallel__(self, instance, notes=[]):
         self.comment_pins_connections([self.input, self.output, instance.input, instance.output], notes)
 
-        self.input += instance.input
-
-        self.output += instance.output
+        self.connect_priority_net(self.input, instance.input)
+        self.connect_priority_net(self.output, instance.output)
 
         self.connect_power_bus(instance)
 

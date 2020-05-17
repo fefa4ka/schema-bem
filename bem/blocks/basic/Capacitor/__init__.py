@@ -7,8 +7,9 @@ from lcapy import C
 
 class Base(Combination()):
     """
+        # Capacitor
         A capacitor (the old-fashioned name was condenser) is a device that has two wires sticking out of it and has the property
-       `Q = CV` (1)
+       `Q = CV` 
 
         A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other. 
 
@@ -20,6 +21,15 @@ class Base(Combination()):
         When you charge up a capacitor, you’re supplying energy. The capacitor doesn’t get hot; instead, it stores the energy in its internal electric fields.
 
         * Paul Horowitz and Winfield Hill. "1.4.1 Capacitors" The Art of Electronics – 3rd Edition. Cambridge University Press, 2015, pp. 51-52
+
+        ```
+        vs = VS(flow='SINEV')(V=5, frequency=[1, 1e3])
+        load = Resistor()(1000)
+        capacitor = Example()
+        vs & capacitor & load & vs
+
+        watch = capacitor
+        ```
     """
 
     increase = False

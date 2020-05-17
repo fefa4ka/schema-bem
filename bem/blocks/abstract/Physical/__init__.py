@@ -5,6 +5,8 @@ from skidl.utilities import get_unique_name
 from collections import defaultdict
 from copy import copy
 import string
+from PySpice.Unit import FrequencyValue, PeriodValue
+from PySpice.Unit.Unit import UnitValue
 from bem.model import Param
 import sys
 import builtins
@@ -33,6 +35,12 @@ class Base(Electrical()):
         return super().__getitem__(*attrs_or_pins, **criteria)
 
     def willMount(self, model=''):
+        """
+            unit -- Unit in physical part for block abstraction
+            units -- Available units in physical part
+        """
+
+        # Possible to pass custom part from Block props
         part = self.props.get('part', None)
         self.unit = 'A'
 
@@ -64,7 +72,7 @@ class Base(Electrical()):
         if len(parts) == 0:
             self.part_unavailable()
 
-        # TODO: Sort by V, Power, I
+        # Sort by V, Power, I
         def cmp_param(part, param):
             avg = lambda values: mean([abs(float(value)) for value in values]) if len(values) else 0
             values = stock.get_param(part, param)
@@ -109,10 +117,34 @@ class Base(Electrical()):
         if not self.SIMULATION:
             self.template = self.part_template()
 
+        # Apply params
+        stock = Stockman(self)
+        for param in self.get_params():
+            # TODO: Could be more that one param?
+            # More that one param could be only in argument, 
+            # for example `value` for Resistor
+            if param in ['P', 'I', 'Z', 'units', 'unit']:
+                continue
+
+            values = stock.get_param(part, param)
+            if len(values):
+                value = unit_value = values[0]
+                default = getattr(self, param)
+                if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
+                    unit_value = default.clone()
+                    unit_value._value = unit_value._convert_scalar_value(value)
+                elif type(default) in [int, float]:
+                    unit_value = float(value)
+
+                setattr(self, param, unit_value)
+
+        # Apply pins to proper unit in physical pat
         units = defaultdict(lambda: defaultdict(list))
         for pin in self.selected_part.pins:
             units[pin.unit][pin.block_pin].append(pin.pin)
 
+        # If this instance is a child 
+        # Parent have original part with needed unit
         if hasattr(part, 'instance'):
             self._part = part.instance._part
             self.unit = part.unit
@@ -134,7 +166,7 @@ class Base(Electrical()):
     def part_template(self):
         """
             self.name or self.part should contains definition with ':', for example 'Device:R' 
-            or part_template method shoud redefined
+            or part_template method should redefined
         """
         stock = self.selected_part
         if self.props.get('part', None):

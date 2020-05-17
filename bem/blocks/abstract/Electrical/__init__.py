@@ -1,4 +1,5 @@
 from bem import u, Block
+from bem.util import uniq_f7
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
@@ -38,6 +39,9 @@ class Base(Network(port='one')):
         if hasattr(self, 'Power') and not self.P:
             self.consumption(self.V)
 
+        self.finish()
+
+
     def mount(self, *args, **kwargs):
         super().mount(*args, **kwargs)
 
@@ -45,7 +49,8 @@ class Base(Network(port='one')):
             self.consumption(self.V)
 
     def release(self):
-        self.circuit_locals = {}
+        self.build_frame = {}
+        self.build_frames = []
 
         name = self.get_ref()
 
@@ -58,12 +63,11 @@ class Base(Network(port='one')):
 
         self.refs.append(self.ref)
 
-        name = self.ref
-        name = name.split('.')[-1]
-
         def tracer(frame, event, arg, self=self):
             if event == 'return':
-                self.circuit_locals = frame
+                self.build_frame = frame
+                if frame.f_code.co_name == 'circuit':
+                    self.build_frames.append(frame)
 
         # tracer is activated on next call, return or exception
         sys.setprofile(tracer)
@@ -77,46 +81,55 @@ class Base(Network(port='one')):
             tracer_current = tracer_instances.pop()
             sys.setprofile(tracer_instances[-1])
 
+        super().release()
+
+    def ref_inner_blocks(self):
+        name = self.ref
+        name = name.split('.')[-1]
+
         values = []
 
-        for key, value in self.circuit_locals.f_locals.items():
-            is_block_has_part = hasattr(value, 'element') and value.element
-            is_block = issubclass(value.__class__, Block)
-            is_not_refed = value not in values
-            if key != 'self' and is_block and is_not_refed:
-                # Search in code
-                code = []
-                try:
-                    code = inspect.getsourcelines(self.circuit_locals.f_code)[0]
-                except OSError:
-                    if builtins.code:
-                        code = builtins.code.split('\n')
+        for frame in self.build_frames:
+            for key, value in frame.f_locals.items():
+                is_block_has_part = hasattr(value, 'element') and value.element
+                is_block = issubclass(value.__class__, Block)
+                is_not_refed = is_block and value not in values
+                if key != 'self' and is_block and is_not_refed:
+                    # Search in code
+                    code = []
+                    try:
+                        code = inspect.getsourcelines(frame.f_code)[0]
+                    except OSError:
+                        if builtins.code:
+                            code = builtins.code.split('\n')
 
-                notes = []
-                if len(code):
-                    for index, line in enumerate(code):
-                        line = line.replace(' ', '').strip()
-                        if line.find(key + '=') == 0:
-                            comment_line_start = comment_line_end = index
-                            notes = self.inspect_comment(code, comment_line_start, comment_line_end)
-                            self.log(code[comment_line_start])
-                            self.notes += notes
-                            break
+                    notes = []
+                    if len(code):
+                        for index, line in enumerate(code):
+                            line = line.replace(' ', '').strip()
+                            if line.find(key + '=') == 0:
+                                comment_line_start = comment_line_end = index
+                                notes = self.inspect_comment(code, comment_line_start, comment_line_end)
+                                if hasattr(self, 'notes'):
+                                    self.notes = uniq_f7(self.notes + notes)
+                                else:
+                                    self.notes = notes
+                                break
 
-                key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
-                ref = name + '_' + key
+                    key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
+                    ref = name + '_' + key
 
-                if is_block_has_part:
-                    values.append(value)
-                    value._part.ref = ref
-                    value._part.notes += notes
+                    if is_block_has_part:
+                        values.append(value)
+                        value._part.ref = ref
+                        value._part.notes = uniq_f7(value._part.notes + notes)
 
-                value.ref = ref
+                    value.ref = ref
+    def finish(self):
+        super().finish()
 
-
+        self.ref_inner_blocks()
         self.annotate_pins_connections()
-
-        super().release()
 
     def annotate_pins_connections(self):
         pads = self.get_pins()
@@ -127,12 +140,13 @@ class Base(Network(port='one')):
 
     def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
         """
-            V -- Volts across its input terminal and gnd
+            V -- Volts across blocks v_ref or input terminals and gnd
             V_out -- Volts across its output terminal and gnd
             G -- Conductance `G = 1 / Z`
-            Z -- Input unloaded impedance of block
-            P -- The power dissipated by block
-            I -- The current through a block
+            Z -- Input unloaded impedance of the block
+            P -- The power dissipated by the block
+            I -- The current through the block
+            Load -- Load attached to the block (A, W, Ω)
             I_load -- Connected load presented in Amperes
             R_load -- Connected load presented in Ohms
             P_load -- Connected load presented in Watts
@@ -147,8 +161,21 @@ class Base(Network(port='one')):
             self.element = element
 
             if len(element.pins) == 2:
-                self.input += self.element[1]
-                self.output += self.element[2]
+                positive = 1
+                negative = 2
+
+                if self.element['P']:
+                    positive = 'P'
+                elif self.element['A']:
+                    positive = 'A'
+
+                if self.element['N']:
+                    negative = 'N'
+                elif self.element['K']:
+                    negative = 'K'
+
+                self.input += self.element[positive]
+                self.output += self.element[negative]
 
     # Consumption and Load
     def consumption(self, V):

@@ -3,7 +3,7 @@ from sympy import Integer
 import inspect
 import sys
 import builtins
-from skidl import Bus
+from skidl import Bus, Network
 from skidl.Net import Net as NetType
 from skidl.NetPinList import NetPinList
 
@@ -22,10 +22,26 @@ class Base(Block):
         if transfer:
             self.H = transfer.latex_math()
 
+    def willMount(self):
+        """
+            H -- Transfer function of the block
+        """
+        pass
+
+
+    def finish(self):
+        super().finish()
+
         pins = self.get_pins_definition()
         for pin in pins.keys():
             net = getattr(self, pin)
             if net:
+                if hasattr(self, 'element') and self.element and len(self.element.pins) == 2:
+                    # Try to not use this network name
+                    # Broke css schematics
+                    # net.name = net.name + '_N$'
+                    pass
+
                 net.fixed_name = False
 
     # Link Routines
@@ -39,41 +55,86 @@ class Base(Block):
         return None
 
     def create_network(self):
-        return [self.input, self.output]
+        # detect by caller method name kind of connetion __and__ or __or__
+        # get self from caller
+        # Add notes
 
-    def trace_call_comment(self):
-        frame = sys._getframe(2)
+        notes = self.trace_call_comment(3)
+
+        frame = sys._getframe(1)
+        connect_method = frame.f_code.co_name
+        instance = frame.f_locals['self']
+        if connect_method == '__and__':
+            self.comment_pins_connections([self.input, instance[-1]], notes)
+        elif connect_method == '__or__':
+            self.comment_pins_connections([self.input, self.output, instance[0], instance[-1]], notes)
+
+        return Network(self.input, self.output)
+
+    def trace_call_comment(self, depth=2):
+        frame = sys._getframe(depth)
+        if frame.f_code.co_name != 'circuit':
+            frame = sys._getframe(depth +1)
+
         # Search in code
         code = []
+        notes = []
         try:
             code = inspect.getsourcelines(frame.f_code)[0]
             code_line = frame.f_lineno - frame.f_code.co_firstlineno
         except OSError:
-            if builtins.code:
+            if hasattr(builtins, 'code'):
                 code = builtins.code.split('\n')
                 code_line = frame.f_lineno - 1
 
-        notes = self.inspect_comment(code, code_line, code_line)
+
+        if len(code):
+            self.log(code[code_line])
+            notes = self.inspect_comment(code, code_line, code_line)
+            self.log(str(notes))
 
         return notes
 
     def comment_pins_connections(self, nets_or_pins, notes):
-        if len(notes) == 0:
-            return
-
         if type(nets_or_pins) != list:
             nets_or_pins = [nets_or_pins]
 
         for net_or_pin in nets_or_pins:
             if type(net_or_pin) is NetType:
-                for pin in net_or_pin.get_pins():
-                    pin.notes += notes
+                elements = net_or_pin.get_pins()
             else:
-                net_or_pin.nots += notes
+                elements = net_or_pin.get_nets()
+
+            for entry in elements:
+                entry.notes += notes
+
+            net_or_pin.notes += notes
+
+    def connect_priority_net(self, net_a, net_b):
+        is_nets = False # type(net_a) is NetType and type(net_b) is NetType
+
+        if is_nets:
+            swp_net = net_a
+
+            if net_a.fixed_name == None:
+                swp_net = net_a
+
+            if net_b.fixed_name == None:
+                swp_net = net_b
+
+            self.log('Connect nets' + str(net_a) + ' + ' + str(net_b) + ' Swap ' + str(swp_net))
+
+            swp_fixed_name = swp_net.fixed_name
+            swp_net.fixed_name = True
+
+        net_a & net_b
+
+        if is_nets:
+            swp_net.fixed_name = swp_fixed_name
 
     def __and__(self, instance, notes=[]):
-        if len(notes) == 0:
-            notes = self.trace_call_comment()
+        self.log("AAADDD")
+        notes = self.trace_call_comment()
 
         if issubclass(type(instance), Block):
             self.__series__(instance, notes)
@@ -90,7 +151,9 @@ class Base(Block):
             return instance
         else:
             self.comment_pins_connections([self.output, instance[0]], notes)
-            self.output & instance[0]
+
+            # self.output & instance[0]
+            self.connect_priority_net(self.output, instance[0])
 
             return instance
 
@@ -118,8 +181,7 @@ class Base(Block):
     """
 
     def __rand__(self, instance, notes=[]):
-        if len(notes) == 0:
-            notes = self.trace_call_comment()
+        notes = self.trace_call_comment()
 
         if issubclass(type(instance), Block):
             instance.__series__(self, notes)
@@ -136,7 +198,7 @@ class Base(Block):
             return self
         else:
             self.comment_pins_connections([self.input, instance[0]], notes)
-            self.input & instance[0]
+            self.connect_priority_net(self.input, instance[0])
 
             return self
 
@@ -144,8 +206,7 @@ class Base(Block):
 
 
     def __or__(self, instance, notes=[]):
-        if len(notes) == 0:
-            notes = self.trace_call_comment()
+        notes = self.trace_call_comment()
 
         # print(f'{self.title} parallel connect {instance.title if hasattr(instance, "title") else instance.name}')
         if issubclass(type(instance), Block):
@@ -155,9 +216,9 @@ class Base(Block):
         elif type(instance) == NetPinList:
             return self.__and__(instance[0], notes)
         else:
-            self.comment_pins_connections([self.input, self.output, instance[0], instance[1]], notes)
-            self.input & instance[0]
-            self.output & instance[-1]
+            self.comment_pins_connections([self.input, self.output, instance[0], instance[-1]], notes)
+            self.connect_priority_net(self.input, instance[0])
+            self.connect_priority_net(self.output, instance[-1])
 
             return self
 

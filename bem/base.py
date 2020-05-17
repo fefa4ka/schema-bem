@@ -26,7 +26,7 @@ class Block:
     files = ['bem/base.py']
     inherited = []
 
-    doc_methods = ['willMount'] # Methods that used for parameters description extraction
+    doc_methods = ['willMount', 'circuit'] # Methods that used for parameters description extraction
 
     def parse_argument(self, value):
         if callable(value):
@@ -36,8 +36,8 @@ class Block:
 
     def __init__(self, *args, **kwargs):
         definition = []
-        mods = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [value])) for key, value in self.mods.items()])
-        props = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [value])) for key, value in self.props.items()])
+        mods = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [str(value)])) for key, value in self.mods.items()])
+        props = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [str(value)])) for key, value in self.props.items()])
         args = ', '.join([key + ' = ' + str(value) for key, value in kwargs.items()])
         if mods:
             definition.append('mods: ' + mods)
@@ -52,6 +52,8 @@ class Block:
 
         self.scope.append((self.owner[-1], self))
         self.owner.append(self)
+
+        self.notes = []
 
         sys.setprofile(None)
 
@@ -109,10 +111,10 @@ class Block:
                 # maybe code available global
                 self.context = {
                     'caller': None,
-                    'code': builtins.code or ''
+                    'code': getattr(builtins, 'code', '')
                 }
 
-                if not builtins.code:
+                if not hasattr(builtins, 'code'):
                     return ref
 
                 code = builtins.code.split('\n')
@@ -120,7 +122,7 @@ class Block:
 
             self.context = {
                 'caller': frame_locals.get('self', None),
-                'code': code[code_line]
+                'code': code[code_line] if len(code) > code_line else ''
             }
 
             comment_line_start = comment_line_end = code_line
@@ -178,9 +180,12 @@ class Block:
             while start > 0 and code[start - 1].strip() != '"""':
                 start -=1
 
+            note= []
             for line_number in range(start, new_end - 1):
                 line = code[line_number]
-                notes.append(line)
+                note.append(line.strip())
+
+            notes.append('\n'.join(note))
 
             start = new_end
 
@@ -274,6 +279,9 @@ class Block:
         params = self.get_params()
         self.log(', '.join([key + ' = ' + str(value['value']) + ' ' + value['unit'].get('suffix', '') for key, value in params.items()]) + '\n')
 
+    def finish(self):
+        pass
+
     @property
     def SIMULATION(self):
         if hasattr(builtins, 'SIMULATION'):
@@ -284,7 +292,7 @@ class Block:
     def __str__(self):
         name = []
         for key, value in self.mods.items():
-            # TODO: Fix hack for network mod
+            #] TODO: Fix hack for network mod
             if key == 'port':
                 continue
 
@@ -308,6 +316,7 @@ class Block:
         description.reverse()
         return description
 
+    @classmethod
     def get_params_description(self):
         """
         Get documentation from docstring of methods in `self.doc_methods` using pattern 'some_arg -- description'
@@ -326,7 +335,7 @@ class Block:
             doc = ''
 
             for method in self.doc_methods:
-                doc_str = hasattr(cls, method) and cls.willMount.__doc__
+                doc_str = hasattr(cls, method) and getattr(cls, method).__doc__
                 if doc_str:
                     doc += doc_str
 
@@ -348,7 +357,6 @@ class Block:
     # Virtual Part
     @classmethod
     def get_default_arguments(cls):
-
         args = []
         defaults = {}
 
@@ -379,6 +387,10 @@ class Block:
     def get_arguments(self):
         arguments = {}
         args, defaults = self.get_default_arguments()
+        try:
+            description = self.get_params_description()
+        except:
+            description = self.__class__.get_params_description()
 
         for arg in args:
             default = getattr(self, arg) if hasattr(self, arg) else defaults.get(arg, None)
@@ -420,6 +432,9 @@ class Block:
                         'name': 'network'
                     }
                 }
+
+            if description.get(arg, None) and arguments.get(arg, None):
+                arguments[arg]['description'] = description[arg]
 
         return arguments
 
@@ -494,15 +509,16 @@ class Block:
     def get_params(self):
         params_default = inspect.getmembers(self, lambda a: not (inspect.isroutine(a)))
 
-        # from PySpice.Unit import u_W, u_A, u_Ohm
-        # params = [('units', ''),
-        #           ('P', 1 @ u_W), ('I', 1 @ u_A), ('Z', 1 @ u_Ohm)]
+        args, defaults = self.get_default_arguments()
 
-        # params_default += params 
+        try:
+            description = self.get_params_description()
+        except:
+            description = self.__class__.get_params_description()
 
         params = {}
         for param, default in params_default:
-            if param in inspect.getargspec(self.willMount).args:# or arguments.get(param, None):
+            if param in args:
                 continue
 
             if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
@@ -529,7 +545,14 @@ class Block:
                     }
                 }
 
+            if description.get(param, None) and params.get(param, None):
+                params[param]['description'] = description[param]
+
         return params
+
+    def error(self, raise_type, message):
+        self.log(message)
+        raise raise_type(message)
 
     def log(self, message, *args):
         # Get the previous frame in the stack, otherwise it would
@@ -542,4 +565,4 @@ class Block:
         )
         from codenamize import codenamize
         block_name = codenamize(id(self), 0)
-        log.info(anchor + block_name + ' ' + self.name + ': ' + str(message), *args)
+        log.info(anchor + self.name + '_' + block_name + ': ' + str(message), *args)
