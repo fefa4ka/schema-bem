@@ -231,7 +231,7 @@ class Schematic:
                 'D': 90
             }
         }
-        rotation = rotation_matrix[orientation][current_orientation]
+        rotation = rotation_matrix[current_orientation][orientation]
 
         log.info('%s.%s %s -> %s %d °', part_ref, pin, current_orientation, orientation, rotation)
         # Rotate
@@ -290,6 +290,10 @@ class Schematic:
                 # add airwire LINE with pin to left
 
             if is_vinv:
+                for part in self.nets[net]:
+                    pin = self.nets[net][part][0]
+                    self.change_pin_orientation(part, pin, 'D')
+                    break
                 self.connect_line('v_inv', net)
 
 
@@ -393,51 +397,172 @@ class Schematic:
                 else:
                     # Get sides of connected pins
                     # Choise most often side and make opposite
-                    first_net = part['connections'][pins[0]]
-                    second_net = part['connections'][pins[1]]
+                    first = pins[0]
+                    second = pins[1]
+                    first_net = part['connections'][first]
+                    second_net = part['connections'][second]
 
                     is_port_connected = False
-
-                    # TODO: If there are ports, orient properly to port direction
-                    # for port in self.ports:
-                    #     port = self.ports[port]
-
-                    #     orientation = 'R' if port['direction'] == 'input' else 'L'
-                    #     if port['net'] == first_net:
-                    #         self.change_pin_orientation(part_name, pins[0], orientation)
-                    #         is_port_connected = port
-                    #         break
-
-                    #     if port['net'] == second_net:
-                    #         self.change_pin_orientation(part_name, pins[1], orientation)
-                    #         is_port_connected = port
-                    #         break
 
 
                     orientations_first = self.net_pin_orientations(first_net, part_name)
                     orientations_second = self.net_pin_orientations(second_net, part_name)
 
+
+                    # TODO: If there are ports, orient properly to port direction
+                    for port in self.ports:
+                        port = self.ports[port]
+
+                        orientation = 'R' if port['direction'] == 'input' else 'L'
+                        if port['net'] == first_net:
+                            orientations_first[orientation] += 1
+                            #self.change_pin_orientation(part_name, pins[0], orientation)
+                            #is_port_connected = port
+                            #break
+
+                        if port['net'] == second_net:
+                            orientations_second[orientation] += 1
+                            #self.change_pin_orientation(part_name, pins[1], orientation)
+                            #is_port_connected = port
+                            #break
+
                     log.info('%s %s - %s - %s %s', str(dict(orientations_first)), first_net, part_name, second_net, str(dict(orientations_second)))
 
-                    if is_port_connected:
-                        log.info('Port %s [%s] connected to %s ' % (port['net'], port['direction'], orientation))
-                        continue
+                    # if is_port_connected:
+                    #    log.info('Port %s [%s] connected to %s ' % (port['net'], port['direction'], orientation))
+                    #    continue
 
                     # if orientations_first['U'] and orientations_second['D']:
                     # L R in one side and U or D in another - VERTICAL
-                    if orientations_first['L'] and orientations_second['R']:
 
+                    def prepare(first, second):
+                        if type(first) != list:
+                            fist = [first]
+
+                        if second == None:
+                            second = first
+
+                        if type(second) != list:
+                            second = [second]
+
+                        return first, second
+
+                    def no(first, second=None):
+                        first, second = prepare(first, second)
+
+                        for orientation in first:
+                            if orientations_first[orientation]:
+                                return False
+
+                        for orientation in second:
+                            if orientations_second[orientation]:
+                                return False
+
+                        return True
+
+                    def yes(first, second=None):
+                        first, second = prepare(first, second)
+
+                        for orientation in first:
+                            if not orientations_first[orientation]:
+                                return False
+
+                        for orientation in second:
+                            if not orientations_second[orientation]:
+                                return False
+
+                        return True
+
+                    def cn(first, second=[]):
+                        first, second = prepare(first, second)
+
+                        total_sum = 0
+                        for orientation in first:
+                            total_sum += orientations_first[orientation]
+
+                        for orientation in second:
+                            total_sum += orientations_second[orientation]
+
+                        return total_sum
+
+                    def gt(first, second=None):
+                        first, second = prepare(first, second)
+
+                        first_sum = 0
+                        for orientation in first:
+                            first_sum += orientations_first[orientation]
+
+                        second_sum = 0
+                        for orientation in second:
+                            second_sum += orientations_second[orientation]
+
+                        if first_sum > second_sum:
+                            return True
+
+                        return False
+
+                    if no(['D', 'U']):
+                        log.info('No D & U')
+                        if cn('R', 'L') > cn('L', 'R'):
+                            self.change_pin_orientation(part_name, first, 'L')
+                        else:
+                            self.change_pin_orientation(part_name, first, 'R')
+
+                    elif no(['L', 'R']):
+                        log.info('No L & R')
+
+                        if cn('D', 'U') > cn('U', 'D'):
+                            self.change_pin_orientation(part_name, first, 'U')
+                        else:
+                            self.change_pin_orientation(part_name, first, 'D')
+
+                    elif no([], ['L', 'R']):
+                        log.info('Second no L & R')
+                        if cn('R') > cn('L'):
+                            self.change_pin_orientation(part_name, first, 'L')
+                        else:
+                            self.change_pin_orientation(part_name, first, 'R')
+
+
+                    elif no(['L', 'R'], []):
+                        log.info('First no L & R')
+                        if cn('R') > cn('L'):
+                            self.change_pin_orientation(part_name, second, 'L')
+                        else:
+                            self.change_pin_orientation(part_name, second, 'R')
+
+                    elif yes('R', 'L') and no('L', 'R'):
+                        log.info('Yes R & L / No L & R')
+                        self.change_pin_orientation(part_name, first, 'L')
+
+                    elif no('R', 'L') and yes('L', 'R'):
+                        log.info('No R & L / Yes L & R')
+                        self.change_pin_orientation(part_name, first, 'R')
+                    """
+                    if orientations_first['L'] and orientations_second['R']:
                         if orientations_first['R'] and orientations_second['L']:
+                            # Connections from every side
                             if orientations_first['R'] > orientations_first['L'] > orientations_second['L'] > orientations_second['R']:
+                                # Most connections from right to first pin
+                                log.info('1.R > 1.L > 2.L > 2.R -> 1L')
+                                
                                 self.change_pin_orientation(part_name, pins[0], 'L')
                             elif orientations_second['L'] > orientations_second['R']:
+                                # Most connection to second pin from left
+                                log.info('2.L > 2.R -> 1R')
                                 self.change_pin_orientation(part_name, pins[0], 'R')
                         else:
+                            # Most connection to first pin from left
+                            log.info('1.L > -> 1R')
                             self.change_pin_orientation(part_name, pins[0], 'R')
 
                     elif orientations_first['R'] and orientations_second['L']:
-
-                        self.change_pin_orientation(part_name, pins[0], 'L')
+                        if orientations_first['R'] > orientations_second['L']:
+                            log.info('1.R & 2.L -> 1L')
+                            self.change_pin_orientation(part_name, pins[0], 'L')
+                        else:
+                            log.info('1.R & 2.L -> 1R')
+                            self.change_pin_orientation(part_name, pins[0], 'R')
 
                     elif orientations_first['U'] and orientations_second['D']:
 
@@ -475,7 +600,7 @@ class Schematic:
 #                    elif orientations_first['R'] and orientations_second['R']:
 #                        self.change_pin_orientation(part_name, pins[0], 'D')
 
-
+"""
 
         # Check is not power connected
         # Orient first input pin to LEFT
@@ -717,10 +842,11 @@ class Schematic:
             failed = True
 
 
-        if not failed:
-            os.remove('schema.svg')
-            os.remove('netlist.json')
-            os.remove('skin.svg')
+        #if False or not failed:
+
+            #os.remove('schema.svg')
+            #os.remove('netlist.json')
+            #os.remove('skin.svg')
 
         if not failed:
             return ''.join(svg)

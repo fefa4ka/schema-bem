@@ -114,9 +114,12 @@ class SchSkinPlotter extends SchPlotter {
         draw.length *= scale
 
         this.plotDrawPinReference(draw, component, transform)
+
 		if (!draw.visibility) return;
+
 		this.plotDrawPinTexts(draw, component, transform);
         this.plotDrawPinSymbol(draw, component, transform);
+
     }
 
     plotDrawPinReference(draw, component, transform) {
@@ -239,14 +242,17 @@ const width = rect.width * scale + PADDING, height = rect.height * scale + PADDI
 // if(rotate == 90) transform = new Transform(0, 1, -1, 0) // 90
 // if(rotate == 180) transform = new Transform(-1, 0, 0, 1) // 180 
 // if(rotate == 270 || rotate == -90) transform = new Transform(0, -1, 1, 0) // 270
-if(rotate == 0) transform = new Transform(scale, 0, 0, -1 * scale) // Base
+const x_mirror = 1
+const y_mirror = 1
+if(rotate == 0) transform = new Transform(scale * x_mirror, 0, 0, y_mirror * scale * -1) // Base
 if(rotate == 90) transform = new Transform(0, scale, -1 * scale, 0) // 90
 if(rotate == 180) transform = new Transform(-1 * scale, 0, 0, scale) // 180 
 if(rotate == 270 || rotate == -90) transform = new Transform(0, -1 * scale, 1 * scale, 0) // 270
 // GND
 pos = rect.pos1
 
-transform = transform.translate(pos.x * -1, pos.y) 
+scale = 1
+transform = transform.translate(pos.x * x_mirror * -1, pos.y * y_mirror ) 
 //transform = transform.translate(1 / scale, 0) 
 
 svgPlotter.startPlot()
