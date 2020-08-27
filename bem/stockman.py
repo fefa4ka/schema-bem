@@ -1,6 +1,6 @@
 from .model import Part
 from .model import Param, Mod, Prop
-from .util import u, is_tolerated
+from .utils.args import u, is_tolerated
 
 class Stockman:
     def __init__(self, block):

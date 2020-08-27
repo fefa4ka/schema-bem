@@ -5,13 +5,14 @@ from PySpice.Unit import u_F, u_V, u_C, u_J, u_F
 import numpy as np
 from lcapy import C
 
+
 class Base(Combination()):
     """
         # Capacitor
         A capacitor (the old-fashioned name was condenser) is a device that has two wires sticking out of it and has the property
-       `Q = CV` 
+       `Q = CV`
 
-        A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other. 
+        A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other.
 
         Taking the derivative of the defining equation 1, you get
         `I = C (dV)/(dt)`
@@ -37,7 +38,7 @@ class Base(Combination()):
     def willMount(self, value = 1 @ u_F):
         """
             value -- The capacitance is proportional to the area and inversely proportional to the spacing. For the simple parallel-plate capacitor, with separation `d` and plate area `A` (and with the spacing `d` much less than the dimensions of the plates), the capacitance `C` is given by `C = 8.85 xx 10^-14 (εA)/d F` where `ε` is the [dielectric constant](https://en.wikipedia.org/wiki/Relative_permittivity) of the insulator, and the dimensions are measured in centimeters.
-            Q -- A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other. 
+            Q -- A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other.
             U_C -- The capacitor stores the energy in its internal electric fields. The amount of stored energy in a charged capacitor is just `U_C = (CV^2)/2`
         """
 

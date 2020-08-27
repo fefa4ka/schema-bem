@@ -11,7 +11,9 @@ from skidl import (KICAD, SPICE, Circuit, Net, search, set_backup_lib,
                    set_default_tool, subcircuit)
 
 from .base import Block
-from .util import ERC_logger, u
+from .utils.logger import ERC_logger
+from .utils.args import u
+
 from pdb import set_trace as bp
 
 libs = ['./spice/']

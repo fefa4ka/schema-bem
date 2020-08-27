@@ -6,7 +6,8 @@ from pathlib import Path
 from collections import defaultdict
 
 from .base import Block
-from .util import u, is_tolerated, merge
+from .utils.args import u, is_tolerated
+from .utils import merge
 from .builder import Build
 from .stockman import Stockman
 from skidl import Net, set_default_tool, set_backup_lib, KICAD
@@ -33,7 +34,7 @@ def bem_scope(root='./blocks'):
         for file in glob.glob(scope_root + '/*/__init__.py'):
             tail = file.split('/')
             element = tail[-2]
-            if element[0].isupper() == False:
+            if not element[0].isupper():
                 continue
 
             blocks[scope][element] = defaultdict(list)

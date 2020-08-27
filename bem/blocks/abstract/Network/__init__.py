@@ -1,4 +1,5 @@
 from bem import Block, Net, Build, u_V, u_s
+from bem.utils.parser import inspect_comments
 from sympy import Integer
 import inspect
 import sys
@@ -89,9 +90,7 @@ class Base(Block):
 
 
         if len(code):
-            self.log(code[code_line])
-            notes = self.inspect_comment(code, code_line, code_line)
-            self.log(str(notes))
+            notes = inspect_comments(code, code_line, code_line)
 
         return notes
 
@@ -133,7 +132,6 @@ class Base(Block):
             swp_net.fixed_name = swp_fixed_name
 
     def __and__(self, instance, notes=[]):
-        self.log("AAADDD")
         notes = self.trace_call_comment()
 
         if issubclass(type(instance), Block):
@@ -187,11 +185,11 @@ class Base(Block):
             instance.__series__(self, notes)
 
             return self
-        elif type(instance) == NetPinList:
+        elif isinstance(instance, NetPinList):
             self.__rand__(instance[0], notes)
 
             return self
-        elif type(instance) == list:
+        elif isinstance(instance, list):
             for block in instance:
                 self.__rand__(block, notes)
 

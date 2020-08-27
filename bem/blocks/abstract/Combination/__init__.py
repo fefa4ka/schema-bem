@@ -21,9 +21,8 @@ class Base(Physical()):
     increase = True
 
     def __init__(self, *args, **kwargs):
-        arguments, defaults = self.get_default_arguments()
 
-        default_value = value = defaults.get('value', None)
+        default_value = value = self.defaults.get('value', None)
 
         if len(args) > 0 and 'value' not in kwargs.keys():
             value = args[0]
@@ -170,11 +169,12 @@ class Base(Physical()):
         value = self.value_closest(self.value)
         value = value.canonise()
         value._value = round(value._value)
+
         return super().circuit(value=value)
 
         # TODO: Wrong implementation
 
-        if self.SIMULATION:
+        if SIMULATION:
             Builder = self.part_spice
         else:
             Builder = self.template

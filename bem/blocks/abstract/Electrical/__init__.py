@@ -1,5 +1,6 @@
 from bem import u, Block
-from bem.util import uniq_f7
+from bem.utils import uniq_f7
+from bem.utils.parser import inspect_comments
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
@@ -109,7 +110,7 @@ class Base(Network(port='one')):
                             line = line.replace(' ', '').strip()
                             if line.find(key + '=') == 0:
                                 comment_line_start = comment_line_end = index
-                                notes = self.inspect_comment(code, comment_line_start, comment_line_end)
+                                notes = inspect_comments(code, comment_line_start, comment_line_end)
                                 if hasattr(self, 'notes'):
                                     self.notes = uniq_f7(self.notes + notes)
                                 else:

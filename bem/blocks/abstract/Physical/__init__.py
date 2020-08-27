@@ -114,7 +114,7 @@ class Base(Electrical()):
 
         self.props['footprint'] = self.selected_part.footprint.replace('=', ':')
 
-        if not self.SIMULATION:
+        if not SIMULATION:
             self.template = self.part_template()
 
         # Apply params
@@ -213,7 +213,7 @@ class Base(Electrical()):
 
         # Only one instance of Part could be used in Block
         if not hasattr(self, '_part') or self._part == None:
-            if self.SIMULATION:
+            if SIMULATION:
                 part = self.part_spice(*args, **kwargs)
             else:
                 part = self.template(*args, **kwargs)

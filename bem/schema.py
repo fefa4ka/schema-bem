@@ -16,6 +16,8 @@ from subprocess import PIPE, run
 from skidl import Part, Net
 
 from bem import Block
+from bem.utils.structer import hierarchy
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -37,7 +39,7 @@ class Schematic:
         self.airwire_nets = defaultdict(lambda: defaultdict(list))
         self.schema = circuit
         self.block = Instance
-        self.hierarchy = Block.hierarchy()
+        self.hierarchy = hierarchy(Block)
         self.blocks = Block.created()
         self.parts = Block.created(Part)
         circuit._merge_net_names()
