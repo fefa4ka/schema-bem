@@ -1,5 +1,3 @@
-
-# from blocks.Abstract.Combination import Base as Block
 from skidl import Part, TEMPLATE
 from PySpice.Unit import u_Ohm, u_V, u_W, u_A, u_S
 from lcapy import R
@@ -9,6 +7,7 @@ from functools import reduce
 from bem import Block, Build, Net, u
 from bem.abstract import Combination, Physical
 import logging
+
 
 class Base(Combination()):
     """
@@ -48,7 +47,4 @@ class Base(Combination()):
     # Lcapy experimental
     def network(self):
         return R(self.value)
-
-    # def expression(self, time=0 @ u_s):
-    #     return self.input + R(self.value)
 

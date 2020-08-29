@@ -9,7 +9,6 @@ import sys
 import inspect
 import builtins
 
-
 tracer_instances = [None]
 
 class Base(Network(port='one')):
@@ -126,18 +125,11 @@ class Base(Network(port='one')):
                         value._part.notes = uniq_f7(value._part.notes + notes)
 
                     value.ref = ref
+
     def finish(self):
         super().finish()
 
         self.ref_inner_blocks()
-        self.annotate_pins_connections()
-
-    def annotate_pins_connections(self):
-        pads = self.get_pins()
-
-        for pad_name in pads.keys():
-            for net in getattr(self, pad_name):
-                self.comment_pins_connections(net, pad_name + ':' + str(self))
 
     def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
         """

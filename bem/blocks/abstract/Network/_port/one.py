@@ -1,4 +1,6 @@
 from .. import Base
+from ..utils import comment_pins_connections, connect_priority_net
+
 
 class Modificator(Base):
     pins = {
@@ -11,17 +13,17 @@ class Modificator(Base):
     # Link Routines
     def __series__(self, instance, notes=[]):
         if hasattr(self, 'output') and hasattr(instance, 'input'):
-            self.comment_pins_connections([instance.input, self.output], notes)
+            comment_pins_connections([instance.input, self.output], notes)
 
-            self.connect_priority_net(self.output, instance.input)
+            connect_priority_net(self.output, instance.input)
 
         self.connect_power_bus(instance)
 
     def __parallel__(self, instance, notes=[]):
-        self.comment_pins_connections([self.input, self.output, instance.input, instance.output], notes)
+        comment_pins_connections([self.input, self.output, instance.input, instance.output], notes)
 
-        self.connect_priority_net(self.input, instance.input)
-        self.connect_priority_net(self.output, instance.output)
+        connect_priority_net(self.input, instance.input)
+        connect_priority_net(self.output, instance.output)
 
         self.connect_power_bus(instance)
 

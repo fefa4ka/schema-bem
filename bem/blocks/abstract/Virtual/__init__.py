@@ -1,8 +1,10 @@
 from bem.abstract import Network
+from ..Network.utils import assign_pins_to_block
+
 
 class Base(Network(port='two')):
     def __init__(self, *args, **kwargs):
-        self.set_pins()
+        assign_pins_to_block(self)
 
         for prop in kwargs.keys():
             if hasattr(self, prop):

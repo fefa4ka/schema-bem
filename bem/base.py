@@ -166,10 +166,7 @@ class Block:
 
     def get_arguments(self):
         arguments = {}
-        try:
-            description = block_params_description(self)
-        except:
-            description = block_params_description(self.__class__)
+        description = block_params_description(self)
 
         for arg in self.arguments:
             default = getattr(self, arg) if hasattr(self, arg) else self.defaults.get(arg, None)
@@ -193,7 +190,7 @@ class Block:
         name = name.split('.')[-1]
 
         context = self.context
-        ref = inspect_ref(context['code'], context['caller']) or name
+        ref = inspect_ref(name, context['code'], context['caller']) or name
 
         return ref
 
