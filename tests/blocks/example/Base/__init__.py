@@ -6,7 +6,7 @@ class Base(Block):
     """
     some_param = 31337
 
-    def willMount(self, some_arg=0):
+    def willMount(self, some_arg="str"):
         """
             some_param -- param description parsed by BEM Block
         """

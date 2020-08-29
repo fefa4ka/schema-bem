@@ -128,7 +128,7 @@ def inspect_comments(code, start, end):
 
     return notes
 
-def trace_call_comment(depth=2):
+def trace_call_comment(depth=1):
     frame = getframe(depth)
     if frame.f_code.co_name != 'circuit':
         frame = getframe(depth + 1)

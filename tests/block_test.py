@@ -1,13 +1,7 @@
 import os
-
-# KiCAD modules and footprints paths
-os.environ['KISYSMOD'] = '/Users/fefa4ka/Development/schema.vc/kicad/modules'
-os.environ['KICAD_SYMBOL_DIR'] = '/Users/fefa4ka/Development/schema.vc/kicad/library'
-# Path where is libngspice.dylib placed
-os.environ['DYLD_LIBRARY_PATH'] = '/usr/local/Cellar/libngspice/28/lib/'
-
 from bem import Block, bem_scope, u_V, u_Ohm
 from bem.model import Part, Param
+from bem.utils.parser import block_description, block_params_description
 
 def test_bem_scope():
     blocks = bem_scope()
@@ -34,12 +28,12 @@ def test_bem_build():
     except:
         instance = base(some_arg="VALUE")
 
-    description = base.get_description(base)
+    description = block_description(base)
     assert description[0] == "\nBasic block. It accept argument 'some_arg' and have parameter 'some_param'.\n", 'Description should generated from block class docstring wrapped with \\n symbol'
 
     test_instance = Base(some_prop="PROP_VAL")(some_arg=12345)
 
-    params_description = base.get_params_description(base)
+    params_description = block_params_description(base)
     assert params_description.get('some_param', None) == 'param description parsed by BEM Block', 'some_param description should be set'
 
     assert_base_instance(instance, 'VALUE')
@@ -58,7 +52,7 @@ def test_bem_build():
     assert test_instance.get_ref() == 'TestInstance', 'Ref should be the same as variable name in code'
     assert test_instance.mods == {}, "Mods should not set for Base block"
     assert len(test_instance.files) == 2, "Only from two files block should be builded"
-    assert test_instance.props.get('some_prop', None) == 'PROP_VAL', "Should be some_prop = PROP_VAL"
+    assert test_instance.props.get('some_prop', [None])[0] == 'PROP_VAL', "Should be some_prop = PROP_VAL"
 
 def test_bem_inherited_build():
     from bem.example import Parent, Child
@@ -74,9 +68,9 @@ def test_bem_inherited_build():
 
     assert_base_instance(instance, 9876)
 
-    instance_builded_parent = Child()(some_arg=0)
+    instance_builded_parent = Child()(some_arg="some_str")
 
-    assert_base_instance(instance_builded_parent, 0)
+    assert_base_instance(instance_builded_parent, "some_str")
     assert instance_builded_parent.name == 'example.Child', 'Instance name should be example.Child'
     assert len(instance_builded_parent.inherited) == 0, "Parent block should not inherit Base block"
     assert len(instance_builded_parent.files) == 3, "Only from three files block should be builded"
@@ -87,17 +81,21 @@ def test_bem_inherited_build():
 def test_bem_modificator():
     from bem.example import Complex
 
+    # Note about Complex definition
     instance = Complex()(some_arg=123)
     assert_base_instance(instance, 123)
     assert instance.mods == {}, "Mods should not set for Base block"
 
-    instance_mod = Complex(size='small')(some_arg=0, small_mod_arg=132)
+    # Comple with small size
+    instance_mod = Complex(size='small')(some_arg="new_str", small_mod_arg=132)
     assert 'small' in instance_mod.mods.get('size', []), "Mod should be size = small"
 
-    assert_base_instance(instance_mod, 0)
+    assert_base_instance(instance_mod, "new_str")
+    # Big Complex
     instance_another_mod = Complex(size='big')(some_arg=333, big_mod_arg=31337)
     assert_base_instance(instance_another_mod, 333)
     assert 'big' in instance_another_mod.mods.get('size', []), "Mod should be size = big"
+    print(instance_another_mod.notes)
 
     instance_multiply_mod = Complex(size=['small', 'big'])(some_arg=123, small_mod_arg=1111, big_mod_arg=31337)
     instance_multiply_mods = instance_multiply_mod.mods.get('size', [])
@@ -117,11 +115,15 @@ def test_network():
     assert len(two.get_pins().keys()) == 6, "In Network port=two should be 6 pins"
 
     assert one.output.is_attached(second.input) == False, "Pins should not connected"
+    # Note about one and second connection
     link = one & second
     assert link == second, "Link should be last connected element"
     assert one.output.is_attached(second.input), "Pins should connected"
+    assert one.output.notes[0] == second.input.notes[0] == "Note about one and second connection", "Comment above code should be parsed to notes"
 
     assert (two.output.is_attached(dubl_two.input) or two.output_n.is_attached(dubl_two.input_n)) == False, "Two port should disconnected"
+    # Note about two
+    # and double two link
     double_link = two & dubl_two
     assert double_link == dubl_two, "Link should be last connected element"
     assert two.output.is_attached(dubl_two.input) and two.output_n.is_attached(dubl_two.input_n), "Two port should connected"
@@ -172,7 +174,7 @@ def test_resistor(value=100):
     part.params.add(param)
 
     test_impeadance = Resistor()(value @ u_Ohm, V=5 @ u_V, Load=570 @ u_Ohm)
-    
+
     assert test_impeadance.value == value * 1.02, "Resistor should be as selected with tolerance error"
     assert test_impeadance.get_ref() == 'TestImpeadance' and test_impeadance.element.ref == 'TestImpeadance', 'Ref should be the same as variable name in code'
     assert test_impeadance.get_params()['V_drop']['value'] == 1.2, "V_drop should be 1.2 V for V == 5, Load = 570 Ohm"

@@ -53,7 +53,7 @@ class Build:
             self.files = sorted(set(self.files), key=self.files.index)
             self.files.reverse()
 
-            if isinstance(self.base.files, list):
+            if hasattr(self.base, 'files') and isinstance(self.base.files, list):
                 self.files += list(self.base.files)
         else:
             self.props = kwargs
@@ -72,8 +72,9 @@ class Build:
         inherited = ancestor.inherited if hasattr(ancestor, 'inherited') else []
         for parent in inherited:
             ParentBlock = parent(**mods)
-            parent_models = ParentBlock.classes[1:-1]
-            self.inherited += parent_models
+            parent_models = ParentBlock.classes
+            parent_models.reverse()
+            self.inherited += parent_models[1:-1]
 
             parent_files = ParentBlock.files.copy()
             self.files += parent_files
