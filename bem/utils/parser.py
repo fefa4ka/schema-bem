@@ -1,6 +1,7 @@
 from inspect import getsourcelines
 import builtins
 import re
+from sys import _getframe as getframe
 
 
 def inspect_code(instance, frame):
@@ -127,8 +128,29 @@ def inspect_comments(code, start, end):
 
     return notes
 
+def trace_call_comment(depth=2):
+    frame = getframe(depth)
+    if frame.f_code.co_name != 'circuit':
+        frame = getframe(depth + 1)
 
-def inspect_ref(code, caller):
+    # Search in code
+    code = []
+    notes = []
+    try:
+        code = getsourcelines(frame.f_code)[0]
+        code_line = frame.f_lineno - frame.f_code.co_firstlineno
+    except OSError:
+        if hasattr(builtins, 'code'):
+            code = builtins.code.split('\n')
+            code_line = frame.f_lineno - 1
+
+    if len(code):
+        notes = inspect_comments(code, code_line, code_line)
+
+    return notes
+
+
+def inspect_ref(name, code, caller):
     """
     Ref extracted from code variable name
     """
@@ -143,11 +165,11 @@ def inspect_ref(code, caller):
     value = code[assign_pos:]
     ref = ''.join([word.capitalize() for word in ref.replace('_', '.').split('.')])
 
-    if assign_pos > parentheses_pos:
-        ref = None
+    if parentheses_pos > 0 and assign_pos > parentheses_pos:
+        ref = name 
 
     if assign_pos == -1 or code.find('return') != -1 or (and_pos != -1 and assign_pos > and_pos) or (or_pos != -1 and assign_pos > or_pos) or value == code:
-        ref = None
+        ref = name 
 
     if caller and hasattr(caller, 'name'):
         block_name = caller.ref.split('.')[-1]
@@ -155,6 +177,7 @@ def inspect_ref(code, caller):
             ref = block_name + '_' + ref
 
     return ref
+
 
 def block_description(block):
     """
@@ -165,9 +188,7 @@ def block_description(block):
         doc = '\n'.join([line.strip() for line in doc.split('\n')])
         description.append(doc)
 
-    description.reverse()
     return description
-
 
 def block_params_description(block):
     """
@@ -196,7 +217,6 @@ def block_params_description(block):
     params = {}
 
     docs = [extract_doc(cls) for cls in block.classes if is_proper_cls(cls) ]
-    docs.reverse()
 
     for doc in docs:
         terms = [line.strip().split(' -- ') for line in doc.split('\n') if len(line.strip())]
