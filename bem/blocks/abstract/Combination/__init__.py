@@ -8,6 +8,7 @@ from PySpice.Unit.Unit import UnitValue
 from skidl import Net
 from bem import Block, u
 from bem.abstract import Physical
+from ..Physical import raise_part_unavailable
 from bem.model import Param
 from copy import copy
 
@@ -119,7 +120,7 @@ class Base(Physical()):
 
         # if available parts too far from desire
         if diff / error_threshold > 2:
-            self.part_unavailable()
+            raise_part_unavailable(self)
 
         values = []
         if max_error > abs(diff) or abs(diff) < error_threshold:
@@ -166,8 +167,10 @@ class Base(Physical()):
 
     def circuit(self):
         # Closest
-        value = self.value_closest(self.value)
-        value = value.canonise()
+        value_closest = self.value_closest(self.value)
+        value = self.value.convert_to_power(0)
+        value._value = value_closest
+        value = self.value.canonise()
         value._value = round(value._value)
 
         return super().circuit(value=value)

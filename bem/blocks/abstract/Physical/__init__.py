@@ -1,22 +1,24 @@
-from bem import Block, Stockman, Build
-from bem.abstract import Electrical
-from skidl import Part, Net, TEMPLATE
-from skidl.utilities import get_unique_name
+import builtins
+import string
+import sys
 from collections import defaultdict
 from copy import copy
-import string
+from functools import lru_cache
+
 from PySpice.Unit import FrequencyValue, PeriodValue
 from PySpice.Unit.Unit import UnitValue
-from bem.model import Param
-import sys
-import builtins
+from skidl import TEMPLATE, Net, Part
+from skidl.utilities import get_unique_name
 
-from functools import lru_cache
+from bem import Block, Build, Stockman
+from bem.abstract import Electrical
+from bem.model import Param
 
 
 @lru_cache(maxsize=100)
 def PartCached(library, symbol, footprint, dest):
     return Part(library, symbol, footprint=footprint, dest=dest)
+
 
 class Base(Electrical()):
     units = 1
@@ -56,8 +58,8 @@ class Base(Electrical()):
         super().mount(*args, **kwargs)
 
         if not hasattr(self, 'selected_part'):
-            selected_part = self.select_part()
-            self.apply_part(selected_part)
+            selected_part = select_part(self)
+            apply_part(self, selected_part)
 
         # Restart profiler
         sys.setprofile(tracer)
@@ -85,81 +87,6 @@ class Base(Electrical()):
         parts = sorted(parts, key=lambda x: (cmp_V, cmp_I, cmp_P))
         return parts
 
-    def select_part(self):
-        # Select allready placed parts in circuit with unused units
-        available = list(self.available_parts())
-
-        model = self.model
-
-        if model:
-            for part in available:
-                if part.model == model:
-                    return part
-
-        # TODO: Logic if no part with certain model. Why not raise lookup error? 
-        part = available[0] if len(available) > 0 else None
-
-        return part
-
-    def apply_part(self, part):
-        if part == None:
-            self.part_unavailable()
-
-        ref = self.get_ref()
-
-        self.selected_part = part
-
-        if self.selected_part.model != self.model:
-            self.model = self.selected_part.model
-
-        self.props['footprint'] = self.selected_part.footprint.replace('=', ':')
-
-        if not SIMULATION:
-            self.template = self.part_template()
-
-        # Apply params
-        stock = Stockman(self)
-        for param in self.get_params():
-            # TODO: Could be more that one param?
-            # More that one param could be only in argument, 
-            # for example `value` for Resistor
-            if param in ['P', 'I', 'Z', 'units', 'unit']:
-                continue
-
-            values = stock.get_param(part, param)
-            if len(values):
-                value = unit_value = values[0]
-                default = getattr(self, param)
-                if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
-                    unit_value = default.clone()
-                    unit_value._value = unit_value._convert_scalar_value(value)
-                elif type(default) in [int, float]:
-                    unit_value = float(value)
-
-                setattr(self, param, unit_value)
-
-        # Apply pins to proper unit in physical pat
-        units = defaultdict(lambda: defaultdict(list))
-        for pin in self.selected_part.pins:
-            units[pin.unit][pin.block_pin].append(pin.pin)
-
-        # If this instance is a child 
-        # Parent have original part with needed unit
-        if hasattr(part, 'instance'):
-            self._part = part.instance._part
-            self.unit = part.unit
-
-            part.instance.element.ref += ref
-
-            builtins.default_circuit.units[self.name].remove(part)
-
-        if len(units.keys()) > 1 and not hasattr(part, 'instance'):
-            part.instance = self
-            del units['A']
-            for free_unit in units.keys():
-                free_unit_part = copy(part)
-                free_unit_part.unit = free_unit
-                builtins.default_circuit.units[self.name].append(free_unit_part)
 
 
     # Physical or Spice Part
@@ -216,7 +143,7 @@ class Base(Electrical()):
             if SIMULATION:
                 part = self.part_spice(*args, **kwargs)
             else:
-                part = self.template(*args, **kwargs)
+                part = self.template(*args, **kwargs, circuit=builtins.default_circuit)
 
             if len(part.pins) == 2:
                 part.set_pin_alias('p', 1)
@@ -259,13 +186,90 @@ class Base(Electrical()):
             self.template[pin].aliases = { alias for alias in aliases }
 
 
-    def part_unavailable(self):
-        args = self.get_arguments()
-        params = self.get_params()
-        values = {
-            **args,
-            **params
-        }
-        description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
+def raise_part_unavailable(block):
+    args = block.get_arguments()
+    params = block.get_params()
+    values = {
+        **args,
+        **params
+    }
+    description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
 
-        raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (self.name, description))
+    raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (block.name, description))
+
+def select_part(block):
+    # Select allready placed parts in circuit with unused units
+    available = list(block.available_parts())
+
+    model = block.model
+
+    if model:
+        for part in available:
+            if part.model == model:
+                return part
+
+    # TODO: Logic if no part with certain model. Why not raise lookup error? 
+    part = available[0] if len(available) > 0 else None
+
+    return part
+
+
+def apply_part(block, part):
+    if part == None:
+        raise_part_unavailable(block)
+
+    ref = block.get_ref()
+
+    block.selected_part = part
+
+    if block.selected_part.model != block.model:
+        block.model = block.selected_part.model
+
+    block.props['footprint'] = block.selected_part.footprint.replace('=', ':')
+
+    if not SIMULATION:
+        block.template = block.part_template()
+
+    # Apply params
+    stock = Stockman(block)
+    for param in block.get_params():
+        # TODO: Could be more that one param?
+        # More that one param could be only in argument, 
+        # for example `value` for Resistor
+        if param in ['P', 'I', 'Z', 'units', 'unit']:
+            continue
+
+        values = stock.get_param(part, param)
+        if len(values):
+            value = unit_value = values[0]
+            default = getattr(block, param)
+            if type(default) in [UnitValue, PeriodValue, FrequencyValue]:
+                unit_value = default.clone()
+                unit_value._value = unit_value._convert_scalar_value(value)
+            elif type(default) in [int, float]:
+                unit_value = float(value)
+
+            setattr(block, param, unit_value)
+
+    # Apply pins to proper unit in physical pat
+    units = defaultdict(lambda: defaultdict(list))
+    for pin in block.selected_part.pins:
+        units[pin.unit][pin.block_pin].append(pin.pin)
+
+    # If this instance is a child 
+    # Parent have original part with needed unit
+    if hasattr(part, 'instance'):
+        block._part = part.instance._part
+        block.unit = part.unit
+
+        part.instance.element.ref += ref
+
+        builtins.default_circuit.units[block.name].remove(part)
+
+    if len(units.keys()) > 1 and not hasattr(part, 'instance'):
+        part.instance = block
+        del units['A']
+        for free_unit in units.keys():
+            free_unit_part = copy(part)
+            free_unit_part.unit = free_unit
+            builtins.default_circuit.units[block.name].append(free_unit_part)

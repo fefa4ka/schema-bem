@@ -1,6 +1,6 @@
 from bem import u, Block
-from bem.utils import uniq_f7
 from bem.utils.parser import inspect_comments
+from bem.utils import uniq_f7
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
@@ -83,53 +83,10 @@ class Base(Network(port='one')):
 
         super().release()
 
-    def ref_inner_blocks(self):
-        name = self.ref
-        name = name.split('.')[-1]
-
-        values = []
-
-        for frame in self.build_frames:
-            for key, value in frame.f_locals.items():
-                is_block_has_part = hasattr(value, 'element') and value.element
-                is_block = issubclass(value.__class__, Block)
-                is_not_refed = is_block and value not in values
-                if key != 'self' and is_block and is_not_refed:
-                    # Search in code
-                    code = []
-                    try:
-                        code = inspect.getsourcelines(frame.f_code)[0]
-                    except OSError:
-                        if builtins.code:
-                            code = builtins.code.split('\n')
-
-                    notes = []
-                    if len(code):
-                        for index, line in enumerate(code):
-                            line = line.replace(' ', '').strip()
-                            if line.find(key + '=') == 0:
-                                comment_line_start = comment_line_end = index
-                                notes = inspect_comments(code, comment_line_start, comment_line_end)
-                                if hasattr(self, 'notes'):
-                                    self.notes = uniq_f7(self.notes + notes)
-                                else:
-                                    self.notes = notes
-                                break
-
-                    key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
-                    ref = name + '_' + key
-
-                    if is_block_has_part:
-                        values.append(value)
-                        value._part.ref = ref
-                        value._part.notes = uniq_f7(value._part.notes + notes)
-
-                    value.ref = ref
-
     def finish(self):
         super().finish()
 
-        self.ref_inner_blocks()
+        ref_inner_blocks(self)
 
     def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
         """
@@ -241,3 +198,45 @@ class Base(Network(port='one')):
     def part_spice(self, *args, **kwargs):
         return None
 
+
+def ref_inner_blocks(block):
+    name = block.ref
+    name = name.split('.')[-1]
+    values = []
+
+    for frame in block.build_frames:
+        for key, value in frame.f_locals.items():
+            is_block_has_part = hasattr(value, 'element') and value.element
+            is_block = issubclass(value.__class__, Block)
+            is_not_refed = is_block and value not in values
+            if key != 'self' and is_block and is_not_refed:
+                # Search in code
+                code = []
+                try:
+                    code = inspect.getsourcelines(frame.f_code)[0]
+                except OSError:
+                    if builtins.code:
+                        code = builtins.code.split('\n')
+
+                notes = []
+                if len(code):
+                    for index, line in enumerate(code):
+                        line = line.replace(' ', '').strip()
+                        if line.find(key + '=') == 0:
+                            comment_line_start = comment_line_end = index
+                            notes = inspect_comments(code, comment_line_start, comment_line_end)
+                            if hasattr(block, 'notes'):
+                                block.notes = uniq_f7(block.notes + notes)
+                            else:
+                                block.notes = notes
+                            break
+
+                key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
+                ref = name + '_' + key
+
+                if is_block_has_part:
+                    values.append(value)
+                    value._part.ref = ref
+                    value._part.notes = uniq_f7(value._part.notes + notes)
+
+                value.ref = ref

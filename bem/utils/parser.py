@@ -166,10 +166,10 @@ def inspect_ref(name, code, caller):
     ref = ''.join([word.capitalize() for word in ref.replace('_', '.').split('.')])
 
     if parentheses_pos > 0 and assign_pos > parentheses_pos:
-        ref = name 
+        ref = name
 
     if assign_pos == -1 or code.find('return') != -1 or (and_pos != -1 and assign_pos > and_pos) or (or_pos != -1 and assign_pos > or_pos) or value == code:
-        ref = name 
+        ref = name
 
     if caller and hasattr(caller, 'name'):
         block_name = caller.ref.split('.')[-1]
@@ -194,18 +194,11 @@ def block_params_description(block):
     """
     Get documentation from docstring of methods in `self.doc_methods` using pattern 'some_arg -- description'
     """
-    def is_proper_cls(cls):
-        if cls == object:
-            return False
-
-        for method in block.doc_methods:
-            if hasattr(cls, method) and cls.willMount.__doc__:
-                return True
-
-        return False
-
     def extract_doc(cls):
         doc = ''
+
+        if cls == object:
+            return doc
 
         for method in block.doc_methods:
             doc_str = hasattr(cls, method) and getattr(cls, method).__doc__
@@ -216,7 +209,7 @@ def block_params_description(block):
 
     params = {}
 
-    docs = [extract_doc(cls) for cls in block.classes if is_proper_cls(cls) ]
+    docs = [extract_doc(cls) for cls in block.classes ]
 
     for doc in docs:
         terms = [line.strip().split(' -- ') for line in doc.split('\n') if len(line.strip())]
