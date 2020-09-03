@@ -1,17 +1,14 @@
-import inspect
 import logging
-import pathlib
-import os
 from collections import OrderedDict
 from functools import lru_cache
 from inspect import getmro
-from pathlib import Path
 
 from skidl import SKIDL, SPICE, TEMPLATE, Part, SchLib, set_default_tool
 from skidl.tools.spice import set_net_bus_prefixes
 
 from .base import Block as BaseBlock
-from .utils.structer import lookup_block_class, lookup_mod_classes, mods_predefined, mods_from_dict
+from .utils.structer import lookup_block_class, lookup_mod_classes, \
+                            mods_predefined, mods_from_dict
 from .utils.args import default_arguments
 
 logger = logging.getLogger(__name__)
@@ -20,6 +17,7 @@ logger = logging.getLogger(__name__)
 @lru_cache(maxsize=100)
 def PartCached(library, symbol, dest):
     return Part(library, symbol, dest=dest)
+
 
 class Build:
     def __init__(self, name, *args, **kwargs):
@@ -58,21 +56,31 @@ class Build:
         else:
             self.props = kwargs
 
-
     # Run once
     def ancestors(self, ancestor=None):
         if not ancestor:
             self.inherited = []
 
         ancestor = ancestor or self.base
-        mods = ancestor.mods if ancestor and hasattr(ancestor, 'mods') else self.mods
+        
+        mods = {}
+        if ancestor and hasattr(ancestor, 'mods'):
+            mods = ancestor.mods
+        else:
+            mods = self.mods
 
-        self.mods = { **mods, **self.mods }
+        self.mods = {
+            **mods,
+            **self.mods
+        }
 
-        inherited = ancestor.inherited if hasattr(ancestor, 'inherited') else []
+        inherited = []
+        if hasattr(ancestor, 'inherited'):
+            inherited = ancestor.inherited
+
         for parent in inherited:
             ParentBlock = parent(**mods)
-            parent_models = ParentBlock.classes
+            parent_models = ParentBlock.models
             parent_models.reverse()
             self.inherited += parent_models[1:-1]
 
@@ -81,9 +89,7 @@ class Build:
 
             self.ancestors(ParentBlock)
 
-
         return list(OrderedDict.fromkeys(self.inherited))
-
 
     def blocks(self):
         if self.base:
@@ -116,16 +122,17 @@ class Build:
         self.files.reverse()
 
         Block = type(self.name,
-                    tuple(Models),
-                    {
-                        'name': self.name,
-                        'mods': self.mods,
-                        'props': self.props,
-                        'files': self.files,
-                        'models': Models
-                    })
+                     tuple(Models),
+                     {
+                         'name': self.name,
+                         'mods': self.mods,
+                         'props': self.props,
+                         'files': self.files,
+                         'models': Models
+                     })
 
         Block.classes = list(getmro(Block))
+        Block.models = tuple(Models)
         Block.arguments, Block.defaults = default_arguments(Block)
 
         return Block

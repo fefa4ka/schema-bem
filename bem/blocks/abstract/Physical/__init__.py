@@ -34,7 +34,7 @@ class Base(Electrical()):
                     if len(params):
                         return params[0]
 
-        return super().__getitem__(*attrs_or_pins, **criteria)
+        return super().__getitem__(*attrs_or_pins, **criteria, match_substring=True)
 
     def willMount(self, model=''):
         """
@@ -72,7 +72,7 @@ class Base(Electrical()):
         parts = stock.suitable_parts(circuits_units)
 
         if len(parts) == 0:
-            self.part_unavailable()
+            raise_part_unavailable(self)
 
         # Sort by V, Power, I
         def cmp_param(part, param):
@@ -86,8 +86,6 @@ class Base(Electrical()):
 
         parts = sorted(parts, key=lambda x: (cmp_V, cmp_I, cmp_P))
         return parts
-
-
 
     # Physical or Spice Part
     def part_template(self):
@@ -141,7 +139,7 @@ class Base(Electrical()):
         # Only one instance of Part could be used in Block
         if not hasattr(self, '_part') or self._part == None:
             if SIMULATION:
-                part = self.part_spice(*args, **kwargs)
+                part = self.part_spice(*args, **kwargs, circuit=builtins.default_circuit)
             else:
                 part = self.template(*args, **kwargs, circuit=builtins.default_circuit)
 
@@ -171,7 +169,6 @@ class Base(Electrical()):
         part.instance = self
 
         return part
-
     @property
     def footprint(self):
         return self.props.get('footprint', None)
@@ -181,9 +178,9 @@ class Base(Electrical()):
             aliases = pins[pin]
             aliases = [aliases] if type(aliases) == str else aliases
             for alias in aliases:
-                self.template.set_pin_alias(alias, pin)
+                self.template.set_pin_alias(alias, pin, match_substring=True)
 
-            self.template[pin].aliases = { alias for alias in aliases }
+            self.template.get_pins(pin, match_substring=True).aliases = { alias for alias in aliases }
 
 
 def raise_part_unavailable(block):
@@ -196,6 +193,7 @@ def raise_part_unavailable(block):
     description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
 
     raise LookupError("Should be part in stock for %s block with suitable characteristics\n%s" % (block.name, description))
+
 
 def select_part(block):
     # Select allready placed parts in circuit with unused units

@@ -49,7 +49,7 @@ def is_tolerated(a, b, tollerance=0.1):
     `P_(nom) * (1 − ε) ≤ P ≤ P_(nom)(1 + ε)`
     in which `P_(nom)` is the nominal specification for the parameter
     such as the resistor value or independent source value,
-    and `ε` is the fractional tolerance for the component. 
+    and `ε` is the fractional tolerance for the component.
 
     For example, a resistor `R` with nominal value of 10 kOhm
     and a 5 percent tolerance could exhibit a resistance

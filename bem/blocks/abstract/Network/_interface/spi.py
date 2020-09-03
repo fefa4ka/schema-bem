@@ -2,7 +2,7 @@ from ..interface import Interfaced
 from bem.basic import Resistor
 from bem import u_Ohm
 from skidl import Part, Net
-import sys, time, pylibftdi as ftdi
+#import sys, time, pylibftdi as ftdi
 
 class Modificator(Interfaced):
     """

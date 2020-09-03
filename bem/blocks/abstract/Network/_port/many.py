@@ -1,6 +1,4 @@
-from .. import Base
-
-class Modificator(Base):
+class Modificator:
     pins = {
         'v_ref': True,
         'input': True,

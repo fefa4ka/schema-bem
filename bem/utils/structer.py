@@ -106,6 +106,7 @@ def lookup_mod_classes(name, selected_mods, libraries=[]):
 
                 instance_mods = Module.Modificator.mods if hasattr(Module.Modificator, 'mods') else {}
                 mods = {
+                    **mods,
                     **instance_mods,
                     mod: values
                 }

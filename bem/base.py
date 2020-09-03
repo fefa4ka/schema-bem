@@ -107,14 +107,14 @@ class Block:
     @classmethod
     def created(cls, block_type=None):
         def block_ref(block):
-            return block.ref if not hasattr(block, 'part') and block else ' ' + getattr(block, 'ref', '_')
+            return block.ref #if not hasattr(block, 'part') and block else ' ' + getattr(block, 'ref', '_')
 
         blocks = {}
 
         for pair in Block.scope:
             if issubclass(pair[1].__class__, block_type or Block):
                 block = pair[1]
-                blocks[block_ref(block)] = block
+                blocks[block.ref] = block
 
         return blocks
 

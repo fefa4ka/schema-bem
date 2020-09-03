@@ -17,9 +17,10 @@ class Base(Combination()):
 
     ```
     vs = VS(flow='SINEV')(V=5, frequency=120)
-    load = Example()
+    resistor = Example()
+    load = Resistor()(1000)
 
-    vs & load & vs
+    vs & resistor & load & vs
 
     watch = load
     ```

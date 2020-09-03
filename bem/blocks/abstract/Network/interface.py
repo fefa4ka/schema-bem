@@ -1,7 +1,7 @@
 from . import Base
 from types import MethodType
 
-class Interfaced(Base):
+class Interfaced:
     interfaces = []
     pins = {
         'v_ref': True,

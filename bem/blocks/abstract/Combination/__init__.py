@@ -50,33 +50,6 @@ class Base(Physical()):
     #     if type(self.value) in [str, int, float]:
     #         self.value._value = float(self.value)
 
-    def values(self):
-        values = []
-
-        for part in self.available_parts():
-            values += self.part_values(part)
-
-        return values
-
-    def part_values(self, part):
-        values = []
-
-        part_params = [entry.value for entry in part.params.where(Param.name == 'value')]
-        for value in part_params:
-            values_range = value.split('/')
-            if len(values_range) > 1:
-                scales, exponenta = values_range
-                for exp in exponenta.strip().split(' '):
-                    exp_unit = self.value.clone().convert_to_power(0)
-                    exp_unit._value = pow(10, prefixes.get(exp, None) or int(exp))
-
-                    scale = np.array(scales.strip().split(' ')).astype(float)
-
-                    values += list(scale * exp_unit)
-            else:
-                values += value.split(' ')
-
-        return values
 
     def available_parts(self):
         available_parts = super().available_parts()
@@ -88,7 +61,7 @@ class Base(Physical()):
         min_error_part = None
 
         for part in available_parts:
-            for value in self.part_values(part):
+            for value in part_values(part, self.value):
                 if value == self.value:
                     suited_parts.append(part)
 
@@ -105,71 +78,16 @@ class Base(Physical()):
 
         return suited_parts
 
-    def values_optimal(self, desire, error=10, error_threshold=0):
-        # TODO: make better
-        closest = self.value_closest(desire)
-
-        closest_value = u(closest)
-        value = u(desire)
-
-        max_error = value * error / 100
-        diff = value - closest_value
-
-        if not error_threshold:
-            error_threshold = max_error
-
-        # if available parts too far from desire
-        if diff / error_threshold > 2:
-            raise_part_unavailable(self)
-
-        values = []
-        if max_error > abs(diff) or abs(diff) < error_threshold:
-            values = [closest]
-        else:
-            if (diff > 0 and self.increase) or (diff < 0 and not self.increase):
-                values = [closest]
-
-                diff_closest = self.values_optimal(abs(diff), error_threshold=error_threshold)
-
-                values += diff_closest
-            else:
-                first_closest = self.value_closest(diff * 2)
-                first_value = u(first_closest)
-                second_value = first_value * diff / (diff - first_value)
-                second_closest = self.value_closest(abs(second_value))
-
-                values.append([first_closest, second_closest])
-
-        return values
-
-    def value_closest(self, value):
-        absolute_value = u(value)
-
-        closest = None
-        for unit in self.values():
-            if not closest:
-                closest = unit
-
-            unit_value = u(unit)
-            closest_value = u(closest)
-
-            diff_unit = abs(absolute_value - unit_value)
-            diff_closest = abs(absolute_value - closest_value)
-
-            if diff_closest > diff_unit:
-                closest = unit
-
-        return closest
-
     def part_aliases(self):
         # TODO: Possibility to apply resistors array
         return
 
     def circuit(self):
         # Closest
-        value_closest = self.value_closest(self.value)
+        available_values = block_values(self)
+        closest = value_closest(available_values, self.value)
         value = self.value.convert_to_power(0)
-        value._value = value_closest
+        value._value = closest
         value = self.value.canonise()
         value._value = round(value._value)
 
@@ -183,7 +101,10 @@ class Base(Physical()):
             Builder = self.template
 
         # TODO: error from settings
-        values = self.values_optimal(self.value, error=15) #if not self.SIMULATION else [self.value]
+        values = values_optimal(available_values, self.value, error=15, increase=self.increase) #if not self.SIMULATION else [self.value]
+        if not values:
+            raise_part_unavailable(block)
+
         elements = []
         # print(f'{self.value} by {values}')
 
@@ -237,4 +158,90 @@ class Base(Physical()):
 
     def series_sum(self, values):
         return sum(values) if self.increase else 1 / sum(1 / np.array(values))
+
+
+def part_values(part, default_value):
+    values = []
+
+    part_params = [entry.value for entry in part.params.where(Param.name == 'value')]
+    for value in part_params:
+        values_range = value.split('/')
+        if len(values_range) > 1:
+            scales, exponenta = values_range
+            for exp in exponenta.strip().split(' '):
+                exp_unit = default_value.clone().convert_to_power(0)
+                exp_unit._value = pow(10, prefixes.get(exp, None) or int(exp))
+
+                scale = np.array(scales.strip().split(' ')).astype(float)
+
+                values += list(scale * exp_unit)
+        else:
+            values += value.split(' ')
+
+    return values
+
+def block_values(block):
+    values = []
+
+    for part in block.available_parts():
+        values += part_values(part, block.value)
+
+    return values
+
+
+def values_optimal(available_values, desire, error=10, error_threshold=0, increase=True):
+    # TODO: make better
+    closest = value_closest(available_values, desire)
+
+    closest_value = u(closest)
+    value = u(desire)
+
+    max_error = value * error / 100
+    diff = value - closest_value
+
+    if not error_threshold:
+        error_threshold = max_error
+
+    # if available parts too far from desire
+    if diff / error_threshold > 2:
+        return None
+
+    values = []
+    if max_error > abs(diff) or abs(diff) < error_threshold:
+        values = [closest]
+    else:
+        if (diff > 0 and increase) or (diff < 0 and not increase):
+            values = [closest]
+
+            diff_closest = values_optimal(available_values, abs(diff), error_threshold=error_threshold, increase=increase)
+
+            values += diff_closest
+        else:
+            first_closest = value_closest(available_values, diff * 2)
+            first_value = u(first_closest)
+            second_value = first_value * diff / (diff - first_value)
+            second_closest = value_closest(available_values, abs(second_value))
+
+            values.append([first_closest, second_closest])
+
+    return values
+
+def value_closest(values, value):
+    absolute_value = u(value)
+
+    closest = None
+    for unit in values:
+        if not closest:
+            closest = unit
+
+        unit_value = u(unit)
+        closest_value = u(closest)
+
+        diff_unit = abs(absolute_value - unit_value)
+        diff_closest = abs(absolute_value - closest_value)
+
+        if diff_closest > diff_unit:
+            closest = unit
+
+    return closest
 

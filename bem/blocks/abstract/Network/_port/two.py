@@ -1,7 +1,7 @@
-from .. import Base
 from ..utils import comment_pins_connections, connect_priority_net
 
-class Modificator(Base):
+
+class Modificator:
     pins = {
         'input': True,
         'output': True,

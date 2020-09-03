@@ -75,9 +75,14 @@ class Stockman:
             if param == 'value':
                 continue
 
-            value = values[index]
+            param_values = values[index]
 
-            is_param_proper = self.check_attrubute(part, param, value)
+            if not isinstance(param_values, list):
+                param_values = [param_values]
+
+            is_param_proper = False
+            for value in param_values:
+                is_param_proper = self.check_attrubute(part, param, value)
 
             if is_param_proper:
                 continue

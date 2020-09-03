@@ -126,6 +126,7 @@ def inspect_comments(code, start, end):
 
     notes.reverse()
 
+    print(notes)
     return notes
 
 def trace_call_comment(depth=1):
@@ -173,8 +174,8 @@ def inspect_ref(name, code, caller):
 
     if caller and hasattr(caller, 'name'):
         block_name = caller.ref.split('.')[-1]
-        if block_name not in ref:
-            ref = block_name + '_' + ref
+        #if block_name not in ref:
+        ref = block_name + '_' + ref
 
     return ref
 
