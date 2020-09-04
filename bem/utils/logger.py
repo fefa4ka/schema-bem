@@ -39,8 +39,14 @@ def ERC_logger():
 def block_definition(block, args, kwargs):
     # Aggregate block definition for logging
     definition = []
-    mods = ', '.join([key + ' = ' + str(' '.join(value if type(value) == list else [str(value)])) for key, value in block.mods.items()])
-    props = ', '.join([key + ' = ' + str(' '.join(str(value) if type(value) == list else [str(value)])) for key, value in block.props.items()])
+    def print_value(value):
+        if isinstance(value, list):
+           return ' '.join(value)
+        else:
+           return str(value)
+
+    mods = ', '.join([key + ' = ' + print_value(value) for key, value in block.mods.items()])
+    props = ', '.join([key + ' = ' + print_value(value) for key, value in block.props.items()])
     args = ', '.join([key + ' = ' + str(value) for key, value in kwargs.items()])
     # models = ', '.join([str(model) for model in block.models])
     # classes = ', '.join([str(model) for model in block.classes])

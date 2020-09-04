@@ -104,6 +104,9 @@ class Block:
                 value = kwargs[arg](self)
                 setattr(self, arg, value)
 
+    def __repr__(self):
+        return "%s(props | mods)(args)"
+
     @classmethod
     def created(cls, block_type=None):
         def block_ref(block):
@@ -152,15 +155,18 @@ class Block:
 
     def __str__(self):
         name = []
+        for word in self.name.split('.'):
+            name.append(word.capitalize())
+
         for key, value in self.mods.items():
             #] TODO: Fix hack for network mod
             if key == 'port':
                 continue
 
-            name.append(' '.join([str(el).capitalize() for el in value]) + ' ' + key.capitalize())
+            name.append(key.capitalize() + ' ' + ' '.join([str(el).capitalize() for el in value]))
 
-        for word in self.name.split('.'):
-            name.append(word.capitalize())
+        block_name = codenamize(id(self), 0)
+        name.append('#' + block_name)
 
         return ' '.join(name)
 
@@ -230,7 +236,6 @@ class Block:
             func.co_firstlineno,
             func.co_name
         )
-        block_name = codenamize(id(self), 0)
 
-        log.info(anchor + self.name + '_' + block_name + ': ' + str(message), *args)
+        log.info(anchor + str(self) + ': ' + str(message), *args)
 

@@ -126,7 +126,6 @@ def inspect_comments(code, start, end):
 
     notes.reverse()
 
-    print(notes)
     return notes
 
 def trace_call_comment(depth=1):

@@ -44,7 +44,7 @@ class Build:
 
             for mod in self.mods:
                 if mod not in mods_loaded:
-                    self.props[mod] = self.mods[mod]
+                    self.props[mod] = kwargs[mod]
 
             self.mods = mods_loaded
 
@@ -62,7 +62,7 @@ class Build:
             self.inherited = []
 
         ancestor = ancestor or self.base
-        
+
         mods = {}
         if ancestor and hasattr(ancestor, 'mods'):
             mods = ancestor.mods
