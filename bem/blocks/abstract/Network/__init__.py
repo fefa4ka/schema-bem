@@ -21,9 +21,11 @@ class Base(Block):
 
         super().__init__(*args, **kwargs)
 
+        """
         transfer = self.transfer()
         if transfer:
             self.H = transfer.latex_math()
+        """
 
     def willMount(self):
         """

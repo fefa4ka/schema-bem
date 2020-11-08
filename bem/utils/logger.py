@@ -45,17 +45,17 @@ def block_definition(block, args, kwargs):
         else:
            return str(value)
 
-    mods = ', '.join([key + ' = ' + print_value(value) for key, value in block.mods.items()])
-    props = ', '.join([key + ' = ' + print_value(value) for key, value in block.props.items()])
-    args = ', '.join([key + ' = ' + str(value) for key, value in kwargs.items()])
+    mods = ' ; '.join([key + '=' + print_value(value) for key, value in block.mods.items()])
+    props = ' ; '.join([key + '=' + print_value(value) for key, value in block.props.items()])
+    args = ' ; '.join([key + '=' + str(value) for key, value in kwargs.items()])
     # models = ', '.join([str(model) for model in block.models])
     # classes = ', '.join([str(model) for model in block.classes])
 
     if mods:
-        definition.append('mods: ' + mods)
+        definition.append(mods)
 
     if props:
-        definition.append('props: ' + props)
+        definition.append(props)
 
     if args:
         definition.append(args)
@@ -67,3 +67,14 @@ def block_definition(block, args, kwargs):
     #    definition.append(classes)
 
     return ' | '.join(definition)
+
+def block_params(block):
+    def print_value(value):
+        if hasattr(value, 'suffix'):
+            return str(value['value']) + ' ' + value['unit'].get('suffix', '')
+        else:
+            return str(value['value']).replace(':', '/')
+
+    params = block.get_params()
+
+    return ' ; '.join([key + '=' + print_value(value) for key, value in params.items()])

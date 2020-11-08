@@ -21,7 +21,7 @@ from bem.utils.structer import hierarchy
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-FORMAT = "%(levelname)s - [%(filename)10s:%(lineno)3s:%(funcName)20s() ] - %(message)10s"
+FORMAT = "%(levelname)s - [%(filename)s:%(lineno)3s:%(funcName)s() ] - %(message)s"
 formatter = logging.Formatter(FORMAT)# '%(name)s - %(levelname)s - %(message)s')
 log_handler = logging.FileHandler('bem.log')
 log_handler.setFormatter(formatter)
@@ -39,7 +39,7 @@ class Schematic:
         self.airwire_nets = defaultdict(lambda: defaultdict(list))
         self.schema = circuit
         self.block = Instance
-        self.hierarchy = hierarchy(Block)
+        self.hierarchy = {} #hierarchy(Block)
         self.blocks = Block.created()
         self.parts = Block.created(Part)
         circuit._merge_net_names()
@@ -803,7 +803,6 @@ class Schematic:
 
                 if net:
                     part['connections'][pin] = [nets.index(net)]
-
 
     def generate(self):
         # If part doesn't have enought pins, create airwires

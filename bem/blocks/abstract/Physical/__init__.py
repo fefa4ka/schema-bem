@@ -57,7 +57,8 @@ class Base(Electrical()):
 
         super().mount(*args, **kwargs)
 
-        if not hasattr(self, 'selected_part'):
+        if not hasattr(self, 'selected_part') and not self.props.get('virtual_part', False):
+            self.log('ebta blya')
             selected_part = select_part(self)
             apply_part(self, selected_part)
 
@@ -66,6 +67,7 @@ class Base(Electrical()):
 
     def available_parts(self):
         from statistics import mean
+
         circuit = builtins.default_circuit
         circuits_units = circuit.units[self.name] if hasattr(circuit, 'units') else []
         stock = Stockman(self)
@@ -133,7 +135,6 @@ class Base(Electrical()):
         return part(*args, **kwargs)
 
     def part(self, *args, **kwargs):
-
         is_mounted = True in [item[1] == self for item in self.scope]
 
         # Only one instance of Part could be used in Block
@@ -154,7 +155,8 @@ class Base(Electrical()):
 
         part = self._part
         ref = self.ref or self.get_ref()
-        part.ref = ref
+        if part.ref != ref:
+            part.ref = ref
 
         if is_mounted:
             self.part_aliases()
@@ -169,6 +171,7 @@ class Base(Electrical()):
         part.instance = self
 
         return part
+
     @property
     def footprint(self):
         return self.props.get('footprint', None)

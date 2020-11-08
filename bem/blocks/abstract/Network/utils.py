@@ -22,7 +22,7 @@ def annotate_pins_connections(block):
 
     for pad_name in pads.keys():
         for net in getattr(block, pad_name):
-            comment_pins_connections(net, pad_name + ':' + str(block))
+            comment_pins_connections(net, pad_name + ':' + block.ref)
 
 def connect_priority_net(net_a, net_b):
     is_nets = False #isinstance(net_a, NetType) and isinstance(net_b, NetType)

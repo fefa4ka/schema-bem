@@ -16,15 +16,15 @@ class Base(Network(port='one')):
 
     doc_methods = ['willMount', 'circuit']
 
-    element = None
-    ref = ''
-
     # For stockman
     P = 0 @ u_W
     I = 0 @ u_A
     Z = 0 @ u_Ohm
 
     def __init__(self, *args, **kwargs):
+        self.ref = ''
+        self.element = None
+
         sys.setprofile(None)
 
         is_ciruit_building = kwargs.get('circuit', True)
@@ -56,6 +56,7 @@ class Base(Network(port='one')):
 
         # TODO: Hack for schema-explorer
         self.ref = ref = self.name if name in ['Block', 'Instance'] else name
+
         ref_index = 1
         while self.ref in self.refs:
             self.ref = ref + '_' + str(ref_index)
@@ -236,7 +237,8 @@ def ref_inner_blocks(block):
 
                 if is_block_has_part:
                     values.append(value)
-                    value._part.ref = ref
+                    if value._part.ref != ref:
+                        value._part.ref = ref
                     value._part.notes = uniq_f7(value._part.notes + notes)
 
                 value.ref = ref

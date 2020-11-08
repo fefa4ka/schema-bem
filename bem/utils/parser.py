@@ -56,7 +56,7 @@ def inspect_code(instance, frame):
         code_part = [line.replace(' ', '') for line in code[0:code_line]]
         code_part.reverse()
 
-        if parentheses_open_pos == -1 or (parentheses_open_pos > parentheses_close_pos):
+        if parentheses_open_pos == -1 or (context['code'].find('=') == -1 and parentheses_open_pos > parentheses_close_pos):
             local_vars = frame.f_code.co_varnames[1:]
 
             for index, line in enumerate(code_part):

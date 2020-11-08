@@ -4,14 +4,12 @@ from ..Network.utils import assign_pins_to_block
 
 class Base(Network(port='two')):
     def __init__(self, *args, **kwargs):
-        assign_pins_to_block(self)
-
+        self.notes = []
+        self.ref = ''
         for prop in kwargs.keys():
-            if hasattr(self, prop):
-                setattr(self, prop, kwargs[prop])
+            setattr(self, prop, kwargs[prop])
 
-    def willMount(self, v_ref=None, input=None, input_n=None, output=None, output_n=None, gnd=None):
-        pass
+        assign_pins_to_block(self)
 
     def circuit(self):
         pass

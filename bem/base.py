@@ -12,7 +12,7 @@ from PySpice.Unit.Unit import UnitValue
 from .utils import uniq_f7
 from .utils.parser import inspect_code, inspect_comments, inspect_ref, block_params_description
 from .utils.args import value_to_strict, value_to_round, default_arguments, parse_arguments
-from .utils.logger import block_definition
+from .utils.logger import block_definition, block_params
 
 from codenamize import codenamize
 
@@ -139,7 +139,7 @@ class Block:
 
         params = self.get_params()
 
-        self.log(', '.join([key + ' = ' + str(getattr(self, key)) for key, value in kwargs.items()]))
+        self.log(' ; '.join([key + '=' + str(getattr(self, key)) for key, value in kwargs.items()]))
 
     def willMount(self):
         pass
@@ -147,8 +147,7 @@ class Block:
     def release(self):
         self.owner.pop()
 
-        params = self.get_params()
-        self.log(', '.join([key + ' = ' + str(value['value']) + ' ' + value['unit'].get('suffix', '') for key, value in params.items()]) + '\n')
+        self.log(block_params(self) + '\n')
 
     def finish(self):
         pass
@@ -231,11 +230,11 @@ class Block:
         # Get the previous frame in the stack, otherwise it would
         # be this function
         func = inspect.currentframe().f_back.f_code
-        anchor = "[%20s:%3i:%15s] - " % (
+        anchor = "[%s:%i:%s] - " % (
             path.basename(path.dirname(func.co_filename)) + '/' + path.basename(func.co_filename),
             func.co_firstlineno,
             func.co_name
         )
 
-        log.info(anchor + str(self) + ': ' + str(message), *args)
+        log.info(("%30s" % anchor) + str(self) + ' - ' + str(message), *args)
 
