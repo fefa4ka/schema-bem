@@ -3,7 +3,9 @@
     "canvas": "^2.6.1",
     "canvas2svg": "^1.0.16",
     "dagre": "^0.8.5",
+    "jsdom": "^16.4.0",
     "kicad-utils": "^0.2.1",
-    "netlistsvg": "^1.0.1"
+    "netlistsvg": "^1.0.1",
+    "roughjs": "^4.3.1"
   }
 }
