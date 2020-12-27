@@ -105,7 +105,7 @@ class Block:
                 setattr(self, arg, value)
 
     def __repr__(self):
-        return "%s(props | mods)(args)"
+        return str(self)
 
     @classmethod
     def created(cls, block_type=None):

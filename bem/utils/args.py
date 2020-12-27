@@ -27,18 +27,29 @@ _prefix = {
     'Y': 1e24,   # yotta
 }
 
+def test_num(P):
+    if P == '' or P == '-': return True
+    try: 
+        float(P)
+        return True
+    except ValueError:
+        return False
+
 def u(unit):
     """Absolute float value of PySpice.Unit
     """
     if type(unit) in [int, float]:
         return float(unit)
     elif type(unit) == str:
-        try:
+        if test_num(unit):
             # unit = '10.2'
             return float(unit)
-        except:
-            # unit = '10 G'
-            return float(unit[:-1]) * _prefix[unit[-1]]
+        else:
+            try:
+                # unit = '10 G'
+                return float(unit[:-1]) * _prefix[unit[-1]]
+            except:
+                return 0
     else:
         return float(unit.convert_to_power())
 
@@ -230,12 +241,14 @@ def parse_arguments(arguments, request, defaults):
 
         props[attr] = copy(defaults.get(attr, None)) #copy(getattr(cls, attr))
 
-        if not value:
+        if isinstance(value, type(None)):
             continue
 
         if isinstance(value, dict):
             value = value.get('value', None)
 
+        #if isinstance(props[attr], bool):
+        #    props[attr] = value
         if isinstance(props[attr], (int, float)):
             props[attr] = float(value)
         #elif type(props[attr]) in [str, bool]:

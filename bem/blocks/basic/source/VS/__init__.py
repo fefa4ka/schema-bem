@@ -7,7 +7,7 @@ from copy import copy
 
 
 class Base(Physical()):
-    def willMount(self, V = 10 @ u_V, wire_gnd=True):
+    def willMount(self, V=10 @ u_V, wire_gnd=True):
         if type(V) == slice:
             self.V_sweep = V
 
@@ -24,7 +24,8 @@ class Base(Physical()):
 
         # Ground problem fix
 
-        if self.wire_gnd:
+        if self.wire_gnd == True:
+            self.log("Wire ground to negative pin")
             gnd = Net.get('0')
             if not gnd:
                 gnd = Net('0')

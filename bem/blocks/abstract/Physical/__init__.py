@@ -12,7 +12,7 @@ from skidl.utilities import get_unique_name
 
 from bem import Block, Build, Stockman
 from bem.abstract import Electrical
-from bem.model import Param
+from bem.model import Part as PartStock, Param
 
 
 @lru_cache(maxsize=100)
@@ -23,10 +23,11 @@ def PartCached(library, symbol, footprint, dest):
 class Base(Electrical()):
     units = 1
     def __getitem__(self, *attrs_or_pins, **criteria):
-        if hasattr(self, 'selected_part') and len(attrs_or_pins) == 1:
+        if hasattr(self, 'selected_part') and isinstance(self.selected_part, PartStock) and len(attrs_or_pins) == 1:
             attr = attrs_or_pins[0]
             if attr and type(attr) == str:
                 attr_value = self.selected_part.spice_params.get(attr, None)
+
                 if attr_value:
                     return attr_value
                 else:
@@ -58,7 +59,6 @@ class Base(Electrical()):
         super().mount(*args, **kwargs)
 
         if not hasattr(self, 'selected_part') and not self.props.get('virtual_part', False):
-            self.log('ebta blya')
             selected_part = select_part(self)
             apply_part(self, selected_part)
 
@@ -73,6 +73,7 @@ class Base(Electrical()):
         stock = Stockman(self)
         parts = stock.suitable_parts(circuits_units)
 
+        self.log('%d suitable parts' % len(parts))
         if len(parts) == 0:
             raise_part_unavailable(self)
 
