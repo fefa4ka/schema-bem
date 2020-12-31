@@ -3,14 +3,17 @@ from bem import Net
 
 
 def comment_pins_connections(nets_or_pins, notes):
+    if not len(notes):
+        return
+
     if not isinstance(nets_or_pins, list):
         nets_or_pins = [nets_or_pins]
 
     for net_or_pin in nets_or_pins:
         if isinstance(net_or_pin, NetType):
             elements = net_or_pin.get_pins()
-        else:
-            elements = net_or_pin.get_nets()
+       # else:
+        #    elements = net_or_pin.get_nets()
 
         for entry in elements:
             entry.notes += notes

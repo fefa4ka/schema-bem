@@ -67,7 +67,7 @@ class Block:
             context = inspect_code(self, frame)
             ref = context['ref']
 
-            if hasattr(context, 'comment_line_start'):
+            if context.get('comment_line_start', None) != None:
                 self.notes = inspect_comments(
                     context['source'],
                     context['comment_line_start'],
@@ -86,8 +86,9 @@ class Block:
 
         # Default V and Load from caller Block
         caller = self.context['caller']
-        if not kwargs.get('V', False) and hasattr(caller, 'V'):
-            self.V = kwargs['V'] = caller.V
+        if not kwargs.get('V', False) and (hasattr(caller, 'V') or ref.get('V', None)):
+            V_parent = ref.get('V', caller and caller.V)
+            self.V = kwargs['V'] = V_parent
 
         if not kwargs.get('Load', False) and hasattr(caller, 'Load'):
             self.Load = kwargs['Load'] = caller.Load

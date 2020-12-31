@@ -4,6 +4,8 @@ from os.path import dirname
 from pathlib import Path
 from inspect import getmro
 from skidl import Part
+from bem.utils.analyzer import Line, assume_line_type, assume_airwire_direction, is_line_power
+
 
 def bem_blocks_path():
     module_path = dirname(__file__)
@@ -221,70 +223,9 @@ def contents(Block):
                 if key in parts: 
                     hierarchy[key] = parts[key]
 
-            if len(key_scope) > 1:
-                # Join lonely parts with first most related heap
-                moved = []
-                for sub_key, value in hierarchy[key].items():
-                    if isinstance(value, Part):
-                        related = related_heap(hierarchy[key], value)
-
-                        if related:
-                            hierarchy[key][related][sub_key] = value
-                            moved.append(sub_key)
-
-                for sub_key in moved:
-                    del hierarchy[key][sub_key]
 
         return hierarchy
 
     root = traverse({}, graph, roots)
 
-
-
     return root['_']
-
-def related_heap(scope, part):
-    pins_number = len(part.pins)
-    most_connected_heap = None
-    most_connected_heap_pins = []
-
-    for key, heap in scope.items():
-        if isinstance(heap, dict):
-            connected_pins = connected_pins_to_heap(heap, part)
-            if len(connected_pins) > len(most_connected_heap_pins):
-                most_connected_heap = key
-                most_connected_heap_pins = connected_pins
-
-            if len(connected_pins) == pins_number:
-                return most_connected_heap
-
-    return most_connected_heap
-
-
-def connected_pins_to_heap(heap, part):
-    connected_pins = []
-    for pin in part.pins:
-        connected = False
-        if pin in connected_pins:
-            break
-
-        for key, value in heap.items():
-            if isinstance(value, dict):
-                value_conneted_pins = connected_pins_to_heap(value, part)
-                connected_pins += value_conneted_pins
-                connected_pins = list(set(connected_pins))
-
-                if pin in value_conneted_pins:
-                    connected = True
-                    break
-            else:
-                for related_pin in value.pins:
-                    if pin.is_attached(related_pin):
-                        connected = True
-                        connected_pins.append(pin)
-                        break
-
-            if connected:
-                break
-
-    return connected_pins

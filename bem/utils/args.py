@@ -3,6 +3,7 @@ from PySpice.Unit import FrequencyValue, PeriodValue
 from PySpice.Unit.Unit import UnitValue
 from copy import copy
 from inspect import getargspec, signature as func_signature
+import numpy as np
 from . import uniq_f7
 
 
@@ -69,30 +70,54 @@ def is_tolerated(a, b, tollerance=0.1):
     `9500 ≤ R ≤ 10,500`
     """
 
+    def normalize(val):
+        if type(val) not in [int, float]:
+            try:
+                val = u(val)
+            except:
+                pass
+
+        return val
+
+    if isinstance(b, str):
+        if b.find('/') > 0:
+            values = [] 
+            values_range = b.split('/')
+            if len(values_range) > 1:
+                scales, exponenta = values_range
+                for exp in exponenta.strip().split(' '):
+                    scale = np.array(scales.strip().split(' ')).astype(float)
+
+                    values += list(scale * _prefix[exp])
+            b = values
+        elif isinstance(a, str) and a != b:
+            return False
+
     if type(a) == list and b in a:
+        if isinstance(b, list):
+            raise("Not implemented")
+
         return True
 
-    if type(a) not in [int, float]:
-        try:
-            a = u(a)
-        except:
-            pass
+    a = normalize(a)
 
-    if type(b) not in [int, float]:
-        try:
-            b = u(b)
-        except:
-            pass
+    if isinstance(b, list):
+        b = [normalize(val) for val in b]
 
-    if b == type(b)(a):
-        return True
+        if a in b:
+            return True
+    else:
+        b = normalize(b)
+
+        if b == type(b)(a):
+            return True
 
     try:
         b = abs(float(b))
         a = abs(float(a))
         diff = abs(a - b)
         if diff < a * tollerance:
-            return True
+            return true
     except:
         pass
 

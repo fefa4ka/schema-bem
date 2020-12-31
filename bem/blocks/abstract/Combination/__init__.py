@@ -88,11 +88,8 @@ class Base(Physical()):
         value = None
         if not self.props.get('virtual_part', False):
             available_values = block_values(self)
-            closest = value_closest(available_values, self.value)
-            value = self.value.convert_to_power(0)
-            value._value = closest
-            value = self.value.canonise()
-            value._value = round(value._value)
+            value = value_closest(available_values, self.value)
+            value = value.canonise()
         else:
             value = self.value
 

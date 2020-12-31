@@ -21,6 +21,10 @@ class Base(Network(port='one')):
     I = 0 @ u_A
     Z = 0 @ u_Ohm
 
+    P_load = 0 @ u_W
+    I_load = 0 @ u_A
+    R_load = 0 @ u_Ohm
+
     def __init__(self, *args, **kwargs):
         self.ref = ''
         self.element = None

@@ -1,4 +1,4 @@
-from inspect import getsourcelines
+from inspect import getsourcelines, getouterframes
 import builtins
 import re
 from sys import _getframe as getframe
