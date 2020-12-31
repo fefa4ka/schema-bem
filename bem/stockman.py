@@ -11,7 +11,7 @@ class Stockman:
         block = self.block
         load = {}
 
-        self.upper_limit = ['V', 'P', 'I', 'Z']
+        self.upper_limit = ['V', 'P', 'I', 'Z', 'I_load', 'R_load', 'P_load']
 
         params = block.get_params()
         args = block.get_arguments()
