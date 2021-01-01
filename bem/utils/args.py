@@ -69,6 +69,12 @@ def is_tolerated(a, b, tollerance=0.1):
     `9500 ≤ R ≤ 10,500`
     """
 
+    if b == type(b)(a):
+        if b == a:
+            return True
+        else:
+            return False
+
     if type(a) == list and b in a:
         return True
 
@@ -83,9 +89,6 @@ def is_tolerated(a, b, tollerance=0.1):
             b = u(b)
         except:
             pass
-
-    if b == type(b)(a):
-        return True
 
     try:
         b = abs(float(b))

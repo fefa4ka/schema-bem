@@ -143,6 +143,11 @@ class Base(Electrical()):
             if SIMULATION:
                 part = self.part_spice(*args, **kwargs, circuit=builtins.default_circuit)
             else:
+                if 'value' in kwargs:
+                    kwargs['value'] = str(kwargs['value'])
+                else:
+                    if len(args):
+                        args[0] = str(args[0])
                 part = self.template(*args, **kwargs, circuit=builtins.default_circuit)
 
             if len(part.pins) == 2:

@@ -37,7 +37,7 @@ if (ref) component.field.reference = ref
 if (value) component.fields[0].name = value
 
 const TEXT_SIZE = 8
-let scale = 0.3
+let scale = 0.01
 
 const PADDING = 0
 
