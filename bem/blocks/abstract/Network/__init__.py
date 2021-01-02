@@ -4,7 +4,7 @@ from sympy import Integer
 import inspect
 import sys
 import builtins
-from skidl import Bus, Network
+from skidl import Bus, Network, Pin
 from skidl.Net import Net as NetType
 from skidl.NetPinList import NetPinList
 from .utils import comment_pins_connections, annotate_pins_connections, connect_priority_net, pins_definition, assign_pins_to_block
