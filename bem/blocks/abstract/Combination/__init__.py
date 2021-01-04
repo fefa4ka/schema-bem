@@ -76,6 +76,8 @@ class Base(Physical()):
             else:
                 suited_parts = available_parts
 
+        self._available_parts = suited_parts
+
         return suited_parts
 
     def part_aliases(self):
