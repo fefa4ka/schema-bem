@@ -1,13 +1,16 @@
 import builtins
+from statistics import mean
 import string
 import sys
+import re
+from os.path import isfile
 from collections import defaultdict
 from copy import copy
 from functools import lru_cache
 
 from PySpice.Unit import FrequencyValue, PeriodValue
 from PySpice.Unit.Unit import UnitValue
-from skidl import TEMPLATE, Net, Part
+from skidl import TEMPLATE, Net, Part, SchLib, KICAD, SKIDL
 from skidl.utilities import get_unique_name
 
 from bem import Block, Build, Stockman
@@ -17,7 +20,24 @@ from bem.model import Part as PartStock, Param
 
 @lru_cache(maxsize=100)
 def PartCached(library, symbol, footprint, dest):
-    return Part(library, symbol, footprint=footprint, dest=dest)
+    #kicad_lib = SchLib(library, tool=KICAD)       # Open a KiCad library.
+    sklib = 'templates/' + library + '_' + symbol
+    templat = None
+
+    if isfile('%s_sklib.py' % sklib):
+        skidl_lib = SchLib(sklib, tool=SKIDL) # Create a SKiDL library object from the new file.
+        template = Part(skidl_lib, symbol, footprint=footprint, dest=dest)                   # Instantiate a diode from the SKiDL library.    if dest == TEMPLATE:
+        print("Load cached", sklib)
+    else:
+        print("Caching", sklib)
+        template = Part(library, symbol, dest=dest)                   # Instantiate a diode from the SKiDL library.    if dest == TEMPLATE:
+        template_lib = SchLib(tool=SKIDL).add_parts(*[template])
+        template_lib.export('templates/' + library + '_' + symbol)
+        template = Part(library, symbol, footprint=footprint, dest=dest)                   # Instantiate a diode from the SKiDL library.    if dest == TEMPLATE:
+
+    template.lib = library
+
+    return template
 
 
 class Base(Electrical()):
@@ -66,14 +86,14 @@ class Base(Electrical()):
         sys.setprofile(tracer)
 
     def available_parts(self):
-        from statistics import mean
+        if hasattr(self, '_available_parts'):
+            return self._available_parts
 
         circuit = builtins.default_circuit
         circuits_units = circuit.units[self.name] if hasattr(circuit, 'units') else []
         stock = Stockman(self)
         parts = stock.suitable_parts(circuits_units)
 
-        self.log('%d suitable parts' % len(parts))
         if len(parts) == 0:
             raise_part_unavailable(self)
 
@@ -88,6 +108,7 @@ class Base(Electrical()):
         cmp_P = lambda part: cmp_param(part, 'P')
 
         parts = sorted(parts, key=lambda x: (cmp_V, cmp_I, cmp_P))
+        self._available_parts = parts
         return parts
 
     # Physical or Spice Part
