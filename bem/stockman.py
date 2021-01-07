@@ -12,6 +12,13 @@ class Stockman:
         load = {}
 
         self.upper_limit = ['V', 'P', 'I', 'Z', 'I_load', 'R_load', 'P_load']
+        upper_limit_prop = block.props.get('upper_limit', [])
+        if upper_limit_prop:
+            if isinstance(upper_limit_prop, list):
+                self.upper_limit += upper_limit_prop
+            else:
+                self.upper_limit.append(upper_limit_prop)
+
 
         params = block.get_params()
         args = block.get_arguments()

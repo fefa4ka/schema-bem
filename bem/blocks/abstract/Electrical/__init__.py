@@ -99,7 +99,7 @@ class Base(Network(port='one')):
             V_out -- Volts across its output terminal and gnd
             G -- Conductance `G = 1 / Z`
             Z -- Input unloaded impedance of the block
-            P -- The power dissipated by the block
+            P -- If a current `I` flows through through a given element in your circuit, losing voltage `V` in the process, then the power dissipated by that circuit element is the product of that current and voltage: `P = I × V`.
             I -- The current through the block
             Load -- Load attached to the block (A, W, Ω)
             I_load -- Connected load presented in Amperes
@@ -230,14 +230,15 @@ def ref_inner_blocks(block):
                         if line.find(key + '=') == 0:
                             comment_line_start = comment_line_end = index
                             notes = inspect_comments(code, comment_line_start, comment_line_end)
-                            if hasattr(block, 'notes'):
-                                block.notes = uniq_f7(block.notes + notes)
+                            if hasattr(value, 'notes'):
+                                value.notes = uniq_f7(value.notes + notes)
                             else:
-                                block.notes = notes
+                                value.notes = notes
                             break
 
                 key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
                 ref = name + '_' + key
+                print(ref, block, notes)
 
                 if is_block_has_part:
                     values.append(value)

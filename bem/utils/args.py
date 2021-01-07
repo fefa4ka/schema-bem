@@ -297,3 +297,16 @@ def parse_arguments(arguments, request, defaults):
             props[attr] = value
 
     return props
+
+
+def has_attr_value(block, attr, key, value):
+    if value in getattr(block, attr).get(key, []):
+        return True
+
+    return False
+
+def has_prop(block, prop, value):
+    return has_attr_value(block, 'props', prop, value)
+
+def has_mod(block, mod, value):
+    return has_attr_value(block, 'mods', mod, value)
