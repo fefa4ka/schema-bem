@@ -65,10 +65,11 @@ def mods_predefined(base):
     classes = [cls for cls in classes if 'builder' not in str(cls)]
     classes.reverse()
 
-    if hasattr(classes, 'mods'):
-        for mod, value in base.mods.items():
-            if not mods.get(mod, None):
-                mods[mod] = value
+    for cls in classes:
+        if hasattr(cls, 'mods'):
+            for mod, value in cls.mods.items():
+                if not mods.get(mod, None):
+                    mods[mod] = value
 
     return mods
 
@@ -102,10 +103,10 @@ def lookup_mod_classes(name, selected_mods, libraries=[]):
                 mod_file = Path(lib) / block_dir / ('_' + mod) / (str(value) + '.py')
                 Module = import_module(module_path + '.' + block_dir.replace('/', '.') + '._' + mod + '.' + value)
                 classes.append(Module.Modificator)
+                files.append(str(mod_file))
 
                 if hasattr(Module.Modificator, 'files'):
                     files += Module.Modificator.files
-                    files.append(str(mod_file))
 
                 instance_mods = Module.Modificator.mods if hasattr(Module.Modificator, 'mods') else {}
                 mods = {

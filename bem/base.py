@@ -45,8 +45,6 @@ class Block:
     doc_methods = ['willMount', 'circuit']
 
     def __init__(self, *args, **kwargs):
-        self.log(block_definition(self, args, kwargs))
-
         # Build scope 
         # Previous block, if they didn't release, owner of current
         self.scope.append((self.owner[-1], self))
@@ -140,7 +138,7 @@ class Block:
 
         params = self.get_params()
 
-        self.log(' ; '.join([key + '=' + str(getattr(self, key)) for key, value in kwargs.items()]))
+        #self.log(' ; '.join([key + '=' + str(getattr(self, key)) for key, value in kwargs.items()]))
 
     def willMount(self):
         pass

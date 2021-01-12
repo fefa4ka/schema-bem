@@ -1,9 +1,9 @@
-from .. import Base
-from bem import Build, u, u_V, u_s
+from bem import u, u_V, u_s
 from lcapy import Vdc
 from sympy import Float
 
-class Modificator(Base):
+
+class Modificator:
     def willMount(self, initial_value=0 @ u_V, pulse_width=0 @ u_s, period=0 @ u_s, delay_time=0 @ u_s):
         self.pulsed_value = self.V
 
