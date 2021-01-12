@@ -18,7 +18,8 @@ prefixes['u'] = prefixes['μ']
 prefixes['0'] = 0
 
 
-class Base(Physical()):
+class Base:
+    inherited = [Physical]
     increase = True
 
     def __init__(self, *args, **kwargs):

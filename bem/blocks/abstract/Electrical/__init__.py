@@ -11,10 +11,11 @@ import builtins
 
 tracer_instances = [None]
 
-class Base(Network(port='one')):
-    mods = {}  # FIX: port=one removing
+class Base:
+    inherited = Network
+    mods = { 'port': 'one' }
 
-    doc_methods = ['willMount', 'circuit']
+    #doc_methods = ['willMount', 'circuit']
 
     # For stockman
     P = 0 @ u_W

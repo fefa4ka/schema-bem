@@ -1,10 +1,10 @@
-from .. import Base
-from bem import Build, u, u_V, u_Hz, u_V, u_s
+from bem import u, u_V, u_Hz, u_V, u_s
 from lcapy import Vac, pi, f, t, sin, sqrt
 from sympy import Integer, Float
 from numpy import linspace
 
-class Modificator(Base):
+
+class Modificator:
     def willMount(self, frequency=1 @ u_Hz, dc_offset=0 @ u_V, offset=0 @ u_V, delay=0 @ u_s, damping_factor=0):
         if type(frequency) == list:
             self.Frequency_range = frequency

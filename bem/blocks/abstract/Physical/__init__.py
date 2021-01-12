@@ -27,9 +27,7 @@ def PartCached(library, symbol, footprint, dest):
     if isfile('%s_sklib.py' % sklib):
         skidl_lib = SchLib(sklib, tool=SKIDL) # Create a SKiDL library object from the new file.
         template = Part(skidl_lib, symbol, footprint=footprint, dest=dest)                   # Instantiate a diode from the SKiDL library.    if dest == TEMPLATE:
-        print("Load cached", sklib)
     else:
-        print("Caching", sklib)
         template = Part(library, symbol, dest=dest)                   # Instantiate a diode from the SKiDL library.    if dest == TEMPLATE:
         template_lib = SchLib(tool=SKIDL).add_parts(*[template])
         template_lib.export('templates/' + library + '_' + symbol)
@@ -40,7 +38,9 @@ def PartCached(library, symbol, footprint, dest):
     return template
 
 
-class Base(Electrical()):
+class Base:
+    inherited = Electrical
+
     units = 1
     def __getitem__(self, *attrs_or_pins, **criteria):
         if hasattr(self, 'selected_part') and isinstance(self.selected_part, PartStock) and len(attrs_or_pins) == 1:
@@ -55,7 +55,10 @@ class Base(Electrical()):
                     if len(params):
                         return params[0]
 
-        return super().__getitem__(*attrs_or_pins, **criteria, match_substring=True)
+        if not criteria.get('match_substring', False):
+            criteria['match_substring'] = True
+
+        return super().__getitem__(*attrs_or_pins, **criteria)
 
     def willMount(self, model=''):
         """
@@ -188,7 +191,7 @@ class Base(Electrical()):
         if is_mounted:
             self.part_aliases()
 
-        if hasattr(self, 'unit') and hasattr(part, 'unit') and part.unit.get('u' + self.unit, False):
+        if isinstance(part, Part) and hasattr(self, 'unit') and hasattr(part, 'unit') and part.unit.get('u' + self.unit, False):
             part = getattr(part, 'u' + self.unit)
             part._ref = ref
 

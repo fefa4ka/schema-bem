@@ -15,6 +15,3 @@ class Base(Network(port='two')):
         for pin in pins.keys():
             original_net = getattr(self, pin, None)
             original_net.fixed_name = False
-
-    def circuit(self):
-        pass

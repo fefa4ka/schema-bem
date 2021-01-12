@@ -56,8 +56,17 @@ class Base(Block):
         if len(pin_ids) == 1 and hasattr(self, str(pin_ids[0])):
             return getattr(self, pin_ids[0])
 
+        pins = []
         if hasattr(self, 'element') and self.element:
-            return self.element.__getitem__(*pin_ids, **criteria)
+            pins = self.element.__getitem__(*pin_ids, **criteria)
+
+        if not pins and isinstance(pin_ids[0], tuple):
+            for pin in pin_ids[0]:
+                pins.append(self.__getitem__(pin, **criteria))
+
+            return pins
+        else:
+            return pins
 
         return None
 
