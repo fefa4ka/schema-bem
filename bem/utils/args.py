@@ -4,7 +4,10 @@ from PySpice.Unit.Unit import UnitValue
 from copy import copy
 from inspect import getargspec, signature as func_signature
 import numpy as np
+import json
 from . import uniq_f7
+from .parser import block_params_description
+from inspect import getmembers, isroutine
 
 
 _prefix = {
@@ -30,7 +33,7 @@ _prefix = {
 
 def test_num(P):
     if P == '' or P == '-': return True
-    try: 
+    try:
         float(P)
         return True
     except ValueError:
@@ -81,7 +84,7 @@ def is_tolerated(a, b, tollerance=0.1):
 
     if isinstance(b, str):
         if b.find('/') > 0:
-            values = [] 
+            values = []
             values_range = b.split('/')
             if len(values_range) > 1:
                 scales, exponenta = values_range
@@ -169,6 +172,7 @@ def min_period(sources):
 
     return period if min_period and period / min_period <= 20 else period / 5 if period else 1
 
+
 def value_to_strict(value):
     default = value
     if type(value) in [UnitValue, PeriodValue, FrequencyValue]:
@@ -204,6 +208,7 @@ def value_to_strict(value):
 
     return value
 
+
 def value_to_round(value):
     is_ci_value = isinstance(value, (UnitValue, PeriodValue, FrequencyValue))
 
@@ -236,6 +241,7 @@ def value_to_round(value):
 
     return value
 
+
 def default_arguments(block):
     args = []
     defaults = {}
@@ -256,6 +262,55 @@ def default_arguments(block):
     args = uniq_f7([arg for arg in args if arg != 'self'])
 
     return args, defaults
+
+
+def get_arguments(block):
+    arguments = {}
+
+    description = block_params_description(block)
+    defaults = getattr(block, 'defaults')
+
+    for arg in getattr(block, 'arguments', {}):
+        default = getattr(block, arg, defaults.get(arg, None))
+        is_list = arg == 'Load' and isinstance(default, list) and len(default)
+
+        if is_list:
+            default = default[0]
+
+        value = value_to_strict(default)
+        if value:
+            arguments[arg] = value
+        if description.get(arg, None) and arguments.get(arg, None):
+            arguments[arg]['description'] = description[arg]
+
+    return arguments
+
+
+def get_params(block):
+    params = {}
+    params_default = getmembers(block, lambda a: not (isroutine(a)))
+
+    description = block_params_description(block)
+
+    params = {}
+    arguments = getattr(block, 'arguments', [])
+    black_list = ['name', '__module__'] + arguments
+    for param, default in params_default:
+        # Skip unrelated attributes
+        # TODO: make faster check
+        if param.startswith('_') \
+                or param in black_list:
+            continue
+
+        value = value_to_round(default)
+
+        if value:
+            params[param] = value
+
+        if description.get(param, None) and params.get(param, None):
+            params[param]['description'] = description[param]
+
+    return params
 
 
 def parse_arguments(arguments, request, defaults):
@@ -299,14 +354,48 @@ def parse_arguments(arguments, request, defaults):
     return props
 
 
+def descript_params(block, params):
+    params['params'] = {param: params['params'][param]
+                        for param in params['params'].keys() if not params['args'].get(param, None)}
+
+    description = block_params_description(block)
+    for param in description.keys():
+        if params['args'].get(param, None):
+            params['args'][param]['description'] = description[param]
+
+        if params['params'].get(param, None):
+            params['params'][param]['description'] = description[param]
+
+    return params
+
+
 def has_attr_value(block, attr, key, value):
     if value in getattr(block, attr).get(key, []):
         return True
 
     return False
 
+
 def has_prop(block, prop, value):
     return has_attr_value(block, 'props', prop, value)
 
+
 def has_mod(block, mod, value):
     return has_attr_value(block, 'mods', mod, value)
+
+def safe_serialize(obj):
+  default = lambda o: str(o)
+  return json.dumps(obj, default=default)
+
+def cached_property(func):
+    " Used on methods to convert them to methods that replace themselves\
+        with their return value once they are called. "
+
+    def cache(*args):
+        self = args[0] # Reference to the class who owns the method
+        funcname = func.__name__
+        ret_value = func(self)
+        setattr(self, funcname, ret_value) # Replace the function with its value
+        return ret_value # Return the result of the function
+
+    return property(cache)

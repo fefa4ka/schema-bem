@@ -15,7 +15,7 @@ from subprocess import PIPE, run
 
 from skidl import Part, Net
 
-from bem import Block
+from bem import Block, get_created_blocks
 from bem.utils.structer import hierarchy
 
 
@@ -40,8 +40,8 @@ class Schematic:
         self.schema = circuit
         self.block = Instance
         self.hierarchy = {} #hierarchy(Block)
-        self.blocks = Block.created()
-        self.parts = Block.created(Part)
+        self.blocks = get_created_blocks()
+        self.parts = get_created_blocks(Part)
         circuit._merge_net_names()
 
         # Get connections Part[pin] for each Net

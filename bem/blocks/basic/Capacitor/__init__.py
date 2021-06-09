@@ -8,22 +8,26 @@ from lcapy import C
 
 class Base(Combination()):
     """
-        # Capacitor
+        ## Description
         A capacitor (the old-fashioned name was condenser) is a device that has two wires sticking out of it and has the property
        `Q = CV`
 
-        A capacitor of `C` farads with `V` volts across its terminals has `Q` coulombs of stored charge on one plate and `−Q` on the other.
+        Taking the derivative of the defining equation, you get `I = C (dV)/(dt)`
 
-        Taking the derivative of the defining equation 1, you get
-        `I = C (dV)/(dt)`
-
-        So a capacitor is more complicated than a resistor: the current is not simply proportional to the voltage, but rather to the rate of change of voltage. If you change the voltage across a farad by 1 volt per second, you are supplying an amp. Conversely, if you supply an amp, its voltage changes by 1 volt per second. A farad is an enormous capacitance, and you usually deal in microfarads (μF), nanofarads (nF), or picofarads (pF).
+        A farad is an enormous capacitance, and you usually deal in microfarads (μF), nanofarads (nF), or picofarads (pF).
 
         When you charge up a capacitor, you’re supplying energy. The capacitor doesn’t get hot; instead, it stores the energy in its internal electric fields.
 
-        * Paul Horowitz and Winfield Hill. "1.4.1 Capacitors" The Art of Electronics – 3rd Edition. Cambridge University Press, 2015, pp. 51-52
+        ## Applications
+        * Filters
+        * Resonators
+        * Power Supply
+        * Voltage Multiplier
 
+        ## Features
+        So a capacitor is more complicated than a resistor: the current is not simply proportional to the voltage, but rather to the rate of change of voltage. If you change the voltage across a farad by 1 volt per second, you are supplying an amp. Conversely, if you supply an amp, its voltage changes by 1 volt per second.
         ```
+        from bem.basic import Capacitor
         vs = VS(flow='SINEV')(V=5, frequency=[1, 1e3])
         load = Resistor()(1000)
         capacitor = Example()
@@ -31,9 +35,11 @@ class Base(Combination()):
 
         watch = capacitor
         ```
-    """
 
-    increase = False
+        ## Reference
+        - Paul Horowitz and Winfield Hill. "1.4.1 Capacitors" The Art of Electronics – 3rd Edition. Cambridge University Press, 2015, pp. 51-52
+    """
+    __increase = False
 
     def willMount(self, value = 1 @ u_F):
         """

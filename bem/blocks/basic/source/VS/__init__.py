@@ -25,7 +25,6 @@ class Base(Physical()):
         # Ground problem fix
 
         if self.wire_gnd == True:
-            self.log("Wire ground to negative pin")
             gnd = Net.get('0')
             if not gnd:
                 gnd = Net('0')

@@ -1,13 +1,19 @@
-from bem import Block, Net, Build, u_V, u_s
-from bem.utils.parser import inspect_comments, trace_call_comment
-from sympy import Integer
+import builtins
 import inspect
 import sys
-import builtins
+
+from numpy import linspace
 from skidl import Bus, Network, Pin
-from skidl.Net import Net as NetType
-from skidl.NetPinList import NetPinList
-from .utils import comment_pins_connections, annotate_pins_connections, connect_priority_net, pins_definition, assign_pins_to_block
+from skidl.net import Net as NetType
+from skidl.netpinlist import NetPinList
+from sympy import Integer
+
+from bem import Block, Build, Net, u_s, u_V
+from bem.utils.parser import inspect_comments, trace_call_comment
+
+from .utils import (annotate_pins_connections, assign_pins_to_block,
+                    comment_pins_connections, connect_priority_net,
+                    pins_definition)
 
 
 class Base(Block):
@@ -17,6 +23,7 @@ class Base(Block):
     gnd = None
 
     def __init__(self, *args, **kwargs):
+
         assign_pins_to_block(self)
 
         super().__init__(*args, **kwargs)
@@ -32,7 +39,6 @@ class Base(Block):
             H -- Transfer function of the block
         """
         pass
-
 
     def finish(self):
         super().finish()
@@ -86,8 +92,6 @@ class Base(Block):
             comment_pins_connections([self.input, self.output, instance[0], instance[-1]], notes)
 
         return Network(self.input, self.output)
-
-
 
     def __and__(self, instance, notes=[]):
         notes = trace_call_comment()
@@ -195,8 +199,10 @@ class Base(Block):
     def get_pins(self):
         pins = {}
         for key, value in inspect.getmembers(self, lambda item: not (inspect.isroutine(item))):
-            if isinstance(value, NetType) and key not in ['__doc__', 'element', 'simulation', 'ref']:
-                pins[key] = [str(pin).split(',')[0] for pin in getattr(self, key) and getattr(self, key).get_pins()]
+            if isinstance(value, NetType) \
+                    and key not in ['__doc__', 'element', 'simulation', 'ref']:
+                pins[key] = [str(pin).split(',')[0]
+                             for pin in getattr(self, key) and getattr(self, key).get_pins()]
 
         return pins
 

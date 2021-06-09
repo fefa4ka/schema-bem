@@ -1,7 +1,12 @@
-from inspect import getsourcelines, getouterframes
+from inspect import getsourcelines, getouterframes, linecache
+from IPython.core.magics.code import extract_symbols
+
 import builtins
 import re
+from functools import reduce
 from sys import _getframe as getframe
+import inspect, sys
+
 
 
 def inspect_code(instance, frame):
@@ -23,7 +28,11 @@ def inspect_code(instance, frame):
                 break
 
         try:
+            # FIXME: Detect source of execution
+            cell_code = linecache.getlines(inspect.getfile(frame))
+            code = cell_code
             code = getsourcelines(frame.f_code)[0]
+
             code_line = frame.f_lineno - frame.f_code.co_firstlineno
         except OSError:
             # If code runned from shell
@@ -98,6 +107,9 @@ def inspect_code(instance, frame):
 def inspect_comments(code, start, end):
     notes = []
 
+    if start > len(code):
+        return []
+
     if start > 0 and code[start - 1].strip() == '"""':
         new_end = start
         start -= 1
@@ -128,6 +140,7 @@ def inspect_comments(code, start, end):
 
     return notes
 
+
 def trace_call_comment(depth=1):
     frame = getframe(depth)
     if frame.f_code.co_name != 'circuit':
@@ -150,10 +163,18 @@ def trace_call_comment(depth=1):
     return notes
 
 
-def inspect_ref(name, code, caller):
+def inspect_ref(block):
     """
     Ref extracted from code variable name
     """
+    ref: str = getattr(block, 'ref', '')
+    name: str = ref or getattr(block, 'name', '')
+    name = name.split('.')[-1]
+
+    context = block.context
+    code = context['code']
+    caller = context['caller']
+
     assign_pos = code.find('=')
     and_pos = code.find('&')
     or_pos = code.find('|')
@@ -163,7 +184,8 @@ def inspect_ref(name, code, caller):
     ref = re.sub('[(){}<>]', '', ref)
     ref = ref.strip().capitalize()
     value = code[assign_pos:]
-    ref = ''.join([word.capitalize() for word in ref.replace('_', '.').split('.')])
+    ref = ''.join([word.capitalize() for word
+                   in ref.replace('_', '.').split('.')])
 
     if parentheses_pos > 0 and assign_pos > parentheses_pos:
         ref = name
@@ -179,6 +201,13 @@ def inspect_ref(name, code, caller):
     return ref
 
 
+def block_ref(block):
+    if not hasattr(block, 'part') and block:
+        return block.ref
+    else:
+        return getattr(block, 'ref', '') + ' / ' + str(block)
+
+
 def block_description(block):
     """
     From docsting of classes builded from.
@@ -190,9 +219,11 @@ def block_description(block):
 
     return description
 
+
 def block_params_description(block):
     """
-    Get documentation from docstring of methods in `self.doc_methods` using pattern 'some_arg -- description'
+    Get documentation from docstring of methods in `self.doc_methods`
+    using pattern 'some_arg -- description'
     """
     def extract_doc(cls):
         doc = ''
@@ -209,11 +240,20 @@ def block_params_description(block):
 
     params = {}
 
-    docs = [extract_doc(cls) for cls in block.classes ]
+    docs = [extract_doc(cls) for cls in block.classes]
 
     for doc in docs:
-        terms = [line.strip().split(' -- ') for line in doc.split('\n') if len(line.strip())]
+        terms = [line.strip().split(' -- ') for line in doc.split('\n')
+                 if len(line.strip())]
+
         for term, description in terms:
             params[term.strip()] = description.strip()
 
     return params
+
+
+def deep_get(dictionary, keys, default=None):
+    return reduce(lambda d, key: d.get(key, default) if isinstance(d, dict) else default,
+                  keys.split("."),
+                  dictionary)
+

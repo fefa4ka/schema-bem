@@ -13,17 +13,16 @@ from bem.model import Param
 from copy import copy
 
 si_units = inspect.getmembers(SiUnits, lambda a: not (inspect.isroutine(a)))
-prefixes = {prefix[1].__prefix__: prefix[1].__power__ for prefix in si_units if hasattr(prefix[1], '__prefix__')}
+prefixes = {prefix[1].PREFIX: prefix[1].POWER for prefix in si_units if hasattr(prefix[1], 'PREFIX')}
 prefixes['u'] = prefixes['μ']
 prefixes['0'] = 0
 
 
 class Base:
-    inherited = [Physical]
-    increase = True
+    inherited = Physical
+    __increase = True
 
     def __init__(self, *args, **kwargs):
-
         default_value = value = self.defaults.get('value', None)
 
         if len(args) > 0 and 'value' not in kwargs.keys():
@@ -81,10 +80,6 @@ class Base:
 
         return suited_parts
 
-    def part_aliases(self):
-        # TODO: Possibility to apply resistors array
-        return
-
     def circuit(self):
         # Closest
 
@@ -92,9 +87,13 @@ class Base:
         if not self.props.get('virtual_part', False):
             available_values = block_values(self)
             value = value_closest(available_values, self.value)
-            value = value.canonise()
+            # FIXME: Test brokens but if disabled schematics with raw value
+            if hasattr(value, "canonise"):
+                value = value.canonise()
         else:
             value = self.value
+
+        self.value = value
 
         return super().circuit(value=value)
 
@@ -106,7 +105,7 @@ class Base:
             Builder = self.template
 
         # TODO: error from settings
-        values = values_optimal(available_values, self.value, error=15, increase=self.increase) #if not self.SIMULATION else [self.value]
+        values = values_optimal(available_values, self.value, error=15, increase=self.__increase) #if not self.SIMULATION else [self.value]
         if not values:
             raise_part_unavailable(block)
 
@@ -126,7 +125,7 @@ class Base:
                     unit = unit.canonise()
 
                     r = Builder(value=unit)
-                    total_value += part / 2 if self.increase else part
+                    total_value += part / 2 if self.__increase else part
 
                     r[1] += parallel_in
                     r[2] += parallel_out
@@ -143,7 +142,7 @@ class Base:
                 unit._value = value
                 unit = unit.canonise()
                 r = Builder(value=unit)
-                total_value += value if self.increase else value / 2
+                total_value += value if self.__increase else value / 2
 
                 self.element = r
 
@@ -159,10 +158,10 @@ class Base:
         self.output += elements[-1][2]
 
     def parallel_sum(self, values):
-        return (1 / sum(1 / np.array(values))) if self.increase else sum(values)
+        return (1 / sum(1 / np.array(values))) if self.__increase else sum(values)
 
     def series_sum(self, values):
-        return sum(values) if self.increase else 1 / sum(1 / np.array(values))
+        return sum(values) if self.__increase else 1 / sum(1 / np.array(values))
 
 
 def part_values(part, default_value):

@@ -1,10 +1,10 @@
 from bem import u, Block
-from bem.utils.parser import inspect_comments
+from bem.utils.parser import inspect_comments, inspect_ref
 from bem.utils import uniq_f7
 from bem.abstract import Network
 from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
-from skidl.Net import Net as NetType
+from skidl.net import Net as NetType
 import sys
 import inspect
 import builtins
@@ -27,7 +27,6 @@ class Base:
     R_load = 0 @ u_Ohm
 
     def __init__(self, *args, **kwargs):
-        self.ref = ''
         self.element = None
 
         sys.setprofile(None)
@@ -46,6 +45,21 @@ class Base:
 
         self.finish()
 
+    def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm, ref=''):
+        """
+            V -- Volts across blocks v_ref or input terminals and gnd.
+            V_out -- Volts across its output terminal and gnd
+            ref -- Reference name used in schematics
+            G -- Conductance `G = 1 / Z`
+            Z -- Input unloaded impedance of the block
+            P -- The power (energy per unit time) consumed by a circuit device. If a current `I` flows through through a given element in your circuit, losing voltage `V` in the process, then the power dissipated by that circuit element is the product of that current and voltage: `P = I × V`. A watt is a joule per second (`1 W = 1 J/s`)
+            I -- Current is the rate of flow of electric charge past a point. The unit of measure is the ampere (`A`).  A current of 1 amp equals a flow of 1 coulomb of charge per second. By convention, current in a circuit is considered to flow from a more positive point to a more negative point, even though the actual electron flow is in the opposite direction.
+            Load -- Load attached to the block (A, W, Ω)
+            I_load -- Connected load presented in Amperes
+            R_load -- Connected load presented in Ohms
+            P_load -- Connected load presented in Watts
+        """
+        self.load(self.V)
 
     def mount(self, *args, **kwargs):
         super().mount(*args, **kwargs)
@@ -57,7 +71,7 @@ class Base:
         self.build_frame = {}
         self.build_frames = []
 
-        name = self.get_ref()
+        name = inspect_ref(self)
 
         # TODO: Hack for schema-explorer
         self.ref = ref = self.name if name in ['Block', 'Instance'] else name
@@ -80,7 +94,7 @@ class Base:
         tracer_instances.append(tracer)
 
         try:
-            # trace the function 
+            # trace the function
             self.circuit()
         finally:
             # disable tracer and replace with old one
@@ -93,21 +107,6 @@ class Base:
         super().finish()
 
         ref_inner_blocks(self)
-
-    def willMount(self, V=10 @ u_V, Load=1000 @ u_Ohm):
-        """
-            V -- Volts across blocks v_ref or input terminals and gnd
-            V_out -- Volts across its output terminal and gnd
-            G -- Conductance `G = 1 / Z`
-            Z -- Input unloaded impedance of the block
-            P -- If a current `I` flows through through a given element in your circuit, losing voltage `V` in the process, then the power dissipated by that circuit element is the product of that current and voltage: `P = I × V`.
-            I -- The current through the block
-            Load -- Load attached to the block (A, W, Ω)
-            I_load -- Connected load presented in Amperes
-            R_load -- Connected load presented in Ohms
-            P_load -- Connected load presented in Watts
-        """
-        self.load(self.V)
 
     # Circuit Creation
     def circuit(self, *args, **kwargs):
@@ -215,6 +214,7 @@ def ref_inner_blocks(block):
             is_block_has_part = hasattr(value, 'element') and value.element
             is_block = issubclass(value.__class__, Block)
             is_not_refed = is_block and value not in values
+
             if key != 'self' and is_block and is_not_refed:
                 # Search in code
                 code = []
@@ -237,9 +237,9 @@ def ref_inner_blocks(block):
                                 value.notes = notes
                             break
 
-                key = ''.join([word.capitalize() for word in key.replace('_', '.').split('.')])
+                key = ''.join([word.capitalize() for word
+                               in key.replace('_', '.').split('.')])
                 ref = name + '_' + key
-                print(ref, block, notes)
 
                 if is_block_has_part:
                     values.append(value)

@@ -5,6 +5,9 @@ from pathlib import Path
 from inspect import getmro
 from skidl import Part
 from bem.utils.analyzer import Line, assume_line_type, assume_airwire_direction, is_line_power
+from typing import List
+import json
+from functools import lru_cache
 
 
 def bem_blocks_path():
@@ -13,7 +16,11 @@ def bem_blocks_path():
 
     return blocks_path
 
-def lookup_block_class(name, libraries=[]):
+@lru_cache
+def get_block_class(name: str):
+    return lookup_block_class(name)
+
+def lookup_block_class(name: str, libraries: List[str]=[]):
     bem_blocks = bem_blocks_path()
     libraries += getenv('BEM_LIBRARIES') or ['blocks']
     libraries.append(bem_blocks)
@@ -73,7 +80,12 @@ def mods_predefined(base):
 
     return mods
 
-def lookup_mod_classes(name, selected_mods, libraries=[]):
+@lru_cache
+def get_mod_classes(name: str, selected_mods: str):
+    mods = json.loads(selected_mods)
+    return lookup_mod_classes(name, mods)
+
+def lookup_mod_classes(name: str, selected_mods, libraries=[]):
     bem_blocks = bem_blocks_path()
     libraries += getenv('BEM_LIBRARIES') or ['blocks']
     libraries.append(bem_blocks)
@@ -221,7 +233,7 @@ def contents(Block):
             # If in scope only element with the same name
             if len(key_scope) == 0 or (len(key_scope) == 1 and key_scope[0] == key):
                 # There are empty structure if no mods for block selected
-                if key in parts: 
+                if key in parts:
                     hierarchy[key] = parts[key]
 
 

@@ -8,7 +8,8 @@ from math import log
 #from numpy.fft import fft
 from PySpice.Unit import u_Degree, u_ms, u_s
 from skidl import (KICAD, SPICE, Circuit, Net, search, set_backup_lib,
-                   set_default_tool, subcircuit)
+                   set_default_tool, subcircuit, reset)
+from skidl.pyspice import *
 
 from .base import Block
 from .utils.logger import ERC_logger
@@ -16,7 +17,7 @@ from .utils.args import u
 
 from pdb import set_trace as bp
 
-libs = ['./spice/']
+libs = 'spice'
 
 
 default_temperature = [-30, 0, 25] @ u_Degree
@@ -37,7 +38,7 @@ class Simulate:
         circuit = builtins.default_circuit
 
         # Connect unused units to NC network
-        # Needed for correct SPICE simulation 
+        # Needed for correct SPICE simulation
         units = circuit.units
         for unit in units:
             for block in units[unit]:
@@ -48,11 +49,10 @@ class Simulate:
 
         self.circuit = circuit.generate_netlist(libs=libs)
 
-        # Grab ERC from logger 
+        # Grab ERC from logger
         erc = ERC_logger()
         builtins.default_circuit.ERC()
         self.ERC = erc.contents()
-        print(self.circuit)
 
         self.node = node
 
@@ -195,8 +195,11 @@ def set_spice_enviroment():
     Block.scope = []
     Block.refs = []
     set_backup_lib('.')
-    set_default_tool(SPICE)
     builtins.SIMULATION = True
+    builtins.SPICE = 'spice'
+
+#    builtins.SPICE = 'SPICE'
+    reset()
 
     scheme = Circuit()
     scheme.units = defaultdict(list)

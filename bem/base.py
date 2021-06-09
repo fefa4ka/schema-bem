@@ -1,27 +1,17 @@
-import builtins
-import inspect
-import logging
-import re
-import sys
+from inspect import currentframe, getargspec, getmembers, isroutine
 from os import path
-from copy import copy
+from sys import _getframe, setprofile
 from types import FunctionType
-
-from PySpice.Unit import FrequencyValue, PeriodValue
-from PySpice.Unit.Unit import UnitValue
-from .utils import uniq_f7
-from .utils.parser import inspect_code, inspect_comments, inspect_ref, block_params_description
-from .utils.args import value_to_strict, value_to_round, default_arguments, parse_arguments
-from .utils.logger import block_definition, block_params
+from typing import List, Set, Dict, Tuple, Optional
 
 from codenamize import codenamize
 
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
-log_handler = logging.FileHandler('bem.log')
-log_handler.setFormatter(formatter)
-log.addHandler(log_handler)
+from .utils.args import parse_arguments, value_to_round, value_to_strict
+from .utils.logger import logger_init, block_params
+from .utils.parser import (block_params_description, inspect_code,
+                           inspect_comments, inspect_ref)
+
+log = logger_init(__name__)
 
 
 class Block:
@@ -30,10 +20,10 @@ class Block:
 
     # Current active block
     owner = [None]
-    refs = []
+    refs: List[str] = []
 
     # Sources used in block building
-    files = ['bem/base.py']
+    files: List[str] = ['bem/base.py']
 
     # Inherited block classes
     # Another block could be inherited in different maniere:
@@ -42,30 +32,31 @@ class Block:
     inherited = []
 
     # Methods that used for parameters description extraction
-    doc_methods = ['willMount', 'circuit']
+    doc_methods: List[str] = ['willMount', 'circuit']
 
     def __init__(self, *args, **kwargs):
-        # Build scope 
+        # Build scope
         # Previous block, if they didn't release, owner of current
         self.scope.append((self.owner[-1], self))
         self.owner.append(self)
 
-        self.notes = []
+        self.notes: List[str] = []
+        self.__pretty_name = None
 
         # Disable tracing
         # Tracing usage also in: abastract/Electrical/__init__.py
-        sys.setprofile(None)
+        setprofile(None)
 
         # Grab name of variable used for instance of this Block
         # Traversal through call stack frames for search the same instance
         deph = 0
-        ref = None
-        while ref == None:
-            frame = sys._getframe(deph)
+        ref: str = None
+        while ref is None:
+            frame = _getframe(deph)
             context = inspect_code(self, frame)
             ref = context['ref']
 
-            if context.get('comment_line_start', None) != None:
+            if context.get('comment_line_start', None) is not None:
                 self.notes = inspect_comments(
                     context['source'],
                     context['comment_line_start'],
@@ -78,13 +69,20 @@ class Block:
 
             deph += 1
 
-        arguments = parse_arguments(self.arguments, kwargs, self.defaults)
+        # Assign passed or assigned property to Block
+        arguments = getattr(self, 'arguments', {})
+        default_arguments = getattr(self, 'defaults', {})
+#        if hasattr(self, 'spice_params'):
+#            default_arguments = { **default_arguments, **{ k: v['value']
+#                                                          for k, v in self.spice_params.items()}}
+        arguments = parse_arguments(arguments, kwargs, default_arguments)
         for prop, value in arguments.items():
             setattr(self, prop, value)
 
         # Default V and Load from caller Block
         caller = self.context['caller']
-        if not kwargs.get('V', False) and (hasattr(caller, 'V') or ref.get('V', None)):
+        if not kwargs.get('V', False) and (hasattr(caller, 'V')
+                                           or ref.get('V', None)):
             V_parent = ref.get('V', caller and caller.V)
             self.V = kwargs['V'] = V_parent
 
@@ -94,141 +92,89 @@ class Block:
         # Do all building routines
         self.mount(*args, **kwargs)
 
-        # Some difference in arguments saving  
+        # Some difference in arguments saving
         for arg in arguments.keys():
-            if hasattr(self, arg) and isinstance(getattr(self, arg), FunctionType):
+            is_default_argument_method = isinstance(getattr(self, arg), FunctionType)
+            is_passed_argument_method = isinstance(kwargs.get(arg, None), FunctionType)
+
+            if hasattr(self, arg) and is_default_argument_method:
                 value = getattr(self, arg)(self)
                 setattr(self, arg, value)
-            elif isinstance(kwargs.get(arg, None), FunctionType):
+            elif is_passed_argument_method:
                 value = kwargs[arg](self)
                 setattr(self, arg, value)
+
+    def __str__(self):
+        if hasattr(self, '__pretty_name'):
+            return self.__pretty_name
+
+        name: List[str] = []
+        for word in getattr(self, 'name', '').split('.'):
+            name.append(word.capitalize())
+
+        for key, value in getattr(self, 'mods', {}).items():
+            # TODO: Fix hack for network mod
+            if key == 'port':
+                continue
+
+            name.append(' '.join([key.capitalize()] + [str(el).capitalize()
+                                                       for el in value]))
+
+        block_name: str = codenamize(id(self), 0)
+        name.append('#' + block_name)
+
+        self.__pretty_name = ' '.join(name)
+
+        return self.__pretty_name
 
     def __repr__(self):
         return str(self)
 
-    @classmethod
-    def created(cls, block_type=None):
-        def block_ref(block):
-            return block.ref #if not hasattr(block, 'part') and block else ' ' + getattr(block, 'ref', '_')
-
-        blocks = {}
-
-        for pair in Block.scope:
-            if issubclass(pair[1].__class__, block_type or Block):
-                block = pair[1]
-                blocks[block.ref] = block
-
-        return blocks
+    def willMount(self):
+        pass
 
     def mount(self, *args, **kwargs):
         # Last class is object
-        classes = self.classes[:-1]
-        # Clear builder duplicates
+        classes = getattr(self, 'classes', [])
+        classes = classes[:-1]
+        # FIXME: Clear builder duplicates
         classes = [cls for cls in classes if 'builder' not in str(cls)]
         # Call .willMount from all inherited classes
         for cls in classes:
             if hasattr(cls, 'willMount'):
-                mount_args_keys = inspect.getargspec(cls.willMount).args
+                mount_args_keys = getargspec(cls.willMount).args
                 mount_kwargs = kwargs.copy()
                 if len(mount_args_keys) == 1:
                     args = []
 
-                mount_args = {key: value for key, value in mount_kwargs.items() if key in mount_args_keys}
+                mount_args = {key: value for key, value in mount_kwargs.items()
+                              if key in mount_args_keys}
                 cls.willMount(self, *args, **mount_args)
 
-        params = self.get_params()
-
-        #self.log(' ; '.join([key + '=' + str(getattr(self, key)) for key, value in kwargs.items()]))
-
-    def willMount(self):
-        pass
+        if DEBUG:
+            self.log(' ; '.join([key + '=' + str(getattr(self, key))
+                                 for key, value in kwargs.items()]))
 
     def release(self):
         self.owner.pop()
 
-        self.log(block_params(self) + '\n')
+        if DEBUG:
+            self.log(block_params(self) + '\n')
 
     def finish(self):
         pass
-
-    def __str__(self):
-        name = []
-        for word in self.name.split('.'):
-            name.append(word.capitalize())
-
-        for key, value in self.mods.items():
-            #] TODO: Fix hack for network mod
-            if key == 'port':
-                continue
-
-            name.append(key.capitalize() + ' ' + ' '.join([str(el).capitalize() for el in value]))
-
-        block_name = codenamize(id(self), 0)
-        name.append('#' + block_name)
-
-        return ' '.join(name)
-
-    def get_arguments(self):
-        arguments = {}
-        description = block_params_description(self)
-
-        for arg in self.arguments:
-            default = getattr(self, arg) if hasattr(self, arg) else self.defaults.get(arg, None)
-            is_list = arg == 'Load' and isinstance(default, list) and len(default) > 0
-            if is_list:
-                default = default[0]
-
-            value = value_to_strict(default)
-            if value:
-                arguments[arg] = value
-            if description.get(arg, None) and arguments.get(arg, None):
-                arguments[arg]['description'] = description[arg]
-
-        return arguments
-
-    def get_ref(self):
-        """
-        Ref extracted from code variable name
-        """
-        name = self.ref if hasattr(self, 'ref') and self.ref else self.name
-        name = name.split('.')[-1]
-
-        context = self.context
-        ref = inspect_ref(name, context['code'], context['caller']) or name
-
-        return ref
-
-    def get_params(self):
-        params_default = inspect.getmembers(self, lambda a: not (inspect.isroutine(a)))
-
-        try:
-            description = block_params_description(self)
-        except:
-            description = block_params_description(self.__class__)
-
-        params = {}
-        for param, default in params_default:
-            if param in self.arguments or param in ['name', '__module__']:
-                continue
-
-            value = value_to_round(default)
-
-            if value:
-                params[param] = value
-
-            if description.get(param, None) and params.get(param, None):
-                params[param]['description'] = description[param]
-
-        return params
 
     def error(self, raise_type, message):
         self.log(message)
         raise raise_type(message)
 
     def log(self, message, *args):
+        if not DEBUG:
+            return
+
         # Get the previous frame in the stack, otherwise it would
         # be this function
-        func = inspect.currentframe().f_back.f_code
+        func = currentframe().f_back.f_code
         anchor = "[%s:%i:%s] - " % (
             path.basename(path.dirname(func.co_filename)) + '/' + path.basename(func.co_filename),
             func.co_firstlineno,

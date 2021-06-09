@@ -1,5 +1,20 @@
 import logging
 from collections import deque
+from .args import get_params
+
+
+def logger_init(name, filename='bem.log'):
+    logging.setLoggerClass(logging.Logger)
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.INFO)
+    log_handler = logging.FileHandler(filename)
+
+    formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
+    log_handler.setFormatter(formatter)
+    log.addHandler(log_handler)
+
+    return log
+
 
 # ERC Logger grabber
 class TailLogHandler(logging.Handler):
@@ -26,6 +41,18 @@ class TailLogger(object):
 
 def ERC_logger():
     erc = logging.getLogger('ERC_Logger')
+    tail = TailLogger(10)
+    log_handler = tail.log_handler
+    for handler in erc.handlers[:]:
+        erc.removeHandler(handler)
+
+    erc.addHandler(log_handler)
+
+    return tail
+
+
+def SKIDL_logger():
+    erc = logging.getLogger('skidl')
     tail = TailLogger(10)
     log_handler = tail.log_handler
     for handler in erc.handlers[:]:
@@ -75,6 +102,6 @@ def block_params(block):
         else:
             return str(value['value']).replace(':', '/')
 
-    params = block.get_params()
+    params = get_params(block)
 
     return ' ; '.join([key + '=' + print_value(value) for key, value in params.items()])

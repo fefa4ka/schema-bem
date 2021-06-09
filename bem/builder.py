@@ -1,28 +1,23 @@
-import logging
+import json
 from collections import OrderedDict
 from functools import lru_cache
-from inspect import getmro, currentframe
-
+from inspect import currentframe, getmro
 from os import path
+from typing import Any, List, Optional, Union, cast, Dict
+
 from skidl import SKIDL, SPICE, TEMPLATE, Part, SchLib, set_default_tool
-from skidl.tools.spice import set_net_bus_prefixes
 
 from .base import Block as BaseBlock
-from .utils.structer import lookup_block_class, lookup_mod_classes, \
-                            mods_predefined, mods_from_dict
-from .utils.args import default_arguments
+from .utils import uniq_f7
+from .utils.args import default_arguments, safe_serialize
+from .utils.structer import (get_block_class, get_mod_classes, mods_from_dict,
+                             mods_predefined)
+
+ModsType = Dict[str, List[str]]
 
 
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s %(levelname)s - %(message)s')
-log_handler = logging.FileHandler('bem.log')
-log_handler.setFormatter(formatter)
-log.addHandler(log_handler)
-
-
-
-
+spice_lib = SchLib('pyspice', tool=SKIDL)
+spice_parts = spice_lib.get_parts()
 
 @lru_cache(maxsize=100)
 def PartCached(library, symbol, dest):
@@ -30,15 +25,16 @@ def PartCached(library, symbol, dest):
 
 
 class Build:
-    def __init__(self, name, *args, **kwargs):
-        self.name = name
-        self.mods = {}
-        self.props = {}
+    def __init__(self, name: str, *args, **kwargs: ModsType):
+        self.name: str = name
+        self.mods: ModsType = {}
+        self.props: ModsType = {}
         self.models = []
         self.inherited = []
-        self.files = []
+        self.files: List[str] = []
 
-        base_file, self.base = lookup_block_class(self.name)
+        base_file:str
+        base_file, self.base = get_block_class(self.name)
 
         if not self.base:
             self.props = kwargs
@@ -50,7 +46,7 @@ class Build:
         # Class could inherit some class
 
         # Base Composed
-        # InheritedBase + InheritedBase Modificator 
+        # InheritedBase + InheritedBase Modificator
         # BlockBase + BlockBase Modificator
 
         bases = [self.base]
@@ -59,18 +55,17 @@ class Build:
             **mods_predefined(self.base),
             **mods_from_dict(kwargs)
         }
+        request_mods_json = safe_serialize(request_mods)
         self.mods = {}
 
-        classes = list(getmro(self.base))[:-1]
+        #classes = list(getmro(self.base))[:-1]
         if hasattr(self.base, 'inherited'):
-            mod_files, mod_classes, mods_loaded = lookup_mod_classes(self.name, request_mods)
+            mod_files, mod_classes, mods_loaded = get_mod_classes(self.name, request_mods_json)
             for cls in mod_classes:
                 request_mods = {
                     **request_mods,
                     **mods_predefined(cls)
                 }
-                log.info(mods_predefined(cls))
-
 
             self.inherited = self.base.inherited
             if not isinstance(self.base.inherited, list):
@@ -84,7 +79,7 @@ class Build:
         base_compound = []
 
         for index, base in enumerate(bases):
-            base_file, base_cls = lookup_block_class(base.name)
+            base_file, base_cls = get_block_class(base.name)
 
             if hasattr(self.base, 'models') and base_cls in self.base.models:
                 # FIX: How recompoud if mods changed?
@@ -93,20 +88,23 @@ class Build:
                 # Get position of original, detect available Modificators
                 continue
 
-            files = []
-            files.append(str(base_file))
+            files = [str(base_file)]
 
             request_mods = {
                 **mods_predefined(base_cls),
                 **request_mods,
             }
-            mod_files, mod_classes, mods_loaded = lookup_mod_classes(base.name, request_mods)
+            request_mods_json = safe_serialize(request_mods)
+            mod_files, mod_classes, mods_loaded = get_mod_classes(base.name, request_mods_json)
             for cls in mod_classes:
                 request_mods = {
                     **mods_predefined(cls),
                     **request_mods,
                 }
-            files += mod_files
+
+            for file in mod_files:
+                if file not in files:
+                    files.append(file)
 
             base_models = []
             if hasattr(base, 'models'):
@@ -118,50 +116,57 @@ class Build:
                 base_models += mod_classes
 
             base_models.reverse()
-            self.models += base_models
-
+            for model in base_models:
+                if model not in self.models:
+                    self.models.append(model)
 
             self.mods = { **self.mods,
                          **mods_loaded }
 
-            files = sorted(set(files), key=files.index)
-            files.reverse()
-
             if hasattr(base, 'files') and isinstance(base.files, list):
-                files += list(base.files)
+                for file in base.files:
+                    if file not in files:
+                        files.append(file)
 
             self.files += files
 
         if self.base not in self.models:
-            self.models.reverse()
-            self.models.append(self.base)
-            self.models += base_compound
-            self.models.reverse()
+            is_modified = False
+            base_compound_models = []
+            for model in base_compound:
+                if model not in self.models:
+                    is_modified = True
+                    base_compound_models.append(model)
+
+            if is_modified:
+                self.models.reverse()
+                self.models.append(self.base)
+                self.models += base_compound_models
+                self.models.reverse()
+            else:
+                self.models.insert(0, self.base)
 
         for mod in request_mods:
             if mod not in self.mods:
-                self.props[mod] = request_mods[mod]
+                prop = request_mods[mod]
+                if not isinstance(prop, list):
+                    prop = [prop]
 
-        self.log(str(self.models))
+                self.props[mod] = prop
+
 
     def blocks(self):
         if self.base:
-            Models = [self.base] + self.models.copy()
+            Models = self.models.copy()
 
             Models.reverse()
         else:
             Models = [BaseBlock]
 
-        return Models
+        return tuple(Models)
 
     @property
     def block(self):
-        def uniq_f7(seq):
-            seen = set()
-            seen_add = seen.add
-            return [x for x in seq if not (x in seen or seen_add(x))]
-
-        Models = uniq_f7(self.blocks())
         self.inherited = []
 
         self.files.reverse()
@@ -175,11 +180,10 @@ class Build:
                          'mods': self.mods,
                          'props': self.props,
                          'files': self.files,
-                         'models': Models
                      })
 
         Block.classes = list(getmro(Block))
-        Block.models = tuple(Models)
+        Block.models = self.blocks()
         Block.arguments, Block.defaults = default_arguments(Block)
 
         return Block
@@ -191,10 +195,8 @@ class Build:
     @property
     def spice(self):
         set_default_tool(SPICE)
-        set_net_bus_prefixes('N', 'B')
-        _splib = SchLib('pyspice', tool=SKIDL)
 
-        for p in _splib.get_parts():
+        for p in spice_parts:
             if self.name == p.name or (hasattr(p, 'aliases') and self.name in p.aliases):
                 return p
 
@@ -203,14 +205,3 @@ class Build:
 
             return PartCached(kicad, spice, dest=TEMPLATE)
 
-    def log(self, message, *args):
-        # Get the previous frame in the stack, otherwise it would
-        # be this function
-        func = currentframe().f_back.f_code
-        anchor = "[%s:%i:%s] - " % (
-            path.basename(path.dirname(func.co_filename)) + '/' + path.basename(func.co_filename),
-            func.co_firstlineno,
-            func.co_name
-        )
-
-        log.info(("%30s" % anchor) + str(self.name) + ' - ' + str(message), *args)

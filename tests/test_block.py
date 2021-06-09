@@ -1,8 +1,14 @@
 import os
 from bem import Block, bem_scope, u_V, u_Ohm
+from bem.utils.logger import logger_init
 from bem.model import Part, Param
 from bem.utils.parser import block_description, block_params_description
 from bem.utils.args import get_arguments, get_params
+import pathlib, sys
+sys.path.append(str(pathlib.Path(__file__).parent))
+
+log = logger_init("test")
+
 
 def test_bem_scope():
     blocks = bem_scope()
@@ -155,14 +161,6 @@ def test_resistor(value=100):
     part.params.add(param)
 
 
-    param = Param(name='value', value=value / 4)
-    param.save()
-    part.params.add(param)
-
-    param = Param(name='value', value=value * 1.02)
-    param.save()
-    part.params.add(param)
-
     part = Part(block='basic.Resistor',
         model='',
         library='Device',
@@ -183,6 +181,14 @@ def test_resistor(value=100):
         spice=''
     )
     part.save()
+
+    param = Param(name='value', value=value / 4)
+    param.save()
+    part.params.add(param)
+
+    param = Param(name='value', value=value * 1.02)
+    param.save()
+    part.params.add(param)
 
     test_impeadance = Resistor()(value @ u_Ohm, V=5 @ u_V, Load=570 @ u_Ohm)
 
@@ -207,11 +213,4 @@ def test_resistor(value=100):
     dc = VS(flow='V')(V=10 @ u_V)
 
     dc & test_impeadance & next_impeadance & last_impeadance & dc
-
-test_bem_scope()
-test_bem_build()
-test_bem_inherited_build()
-test_bem_modificator()
-test_network()
-test_resistor(180)
 

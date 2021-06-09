@@ -1,4 +1,4 @@
-from skidl.Net import Net as NetType
+from skidl.net import Net as NetType
 from bem import Net
 
 

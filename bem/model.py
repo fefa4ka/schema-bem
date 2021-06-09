@@ -6,27 +6,30 @@ class BaseModel(Model):
     class Meta:
         database = db
 
+
 class Stock(BaseModel):
     quantity = IntegerField(default=0)
     place = CharField()
-
 
 class Pin(BaseModel):
     unit = CharField()
     pin = CharField()
     block_pin = CharField()
 
-class Param(BaseModel):
+
+class KeyValueModel(BaseModel):
     name = CharField()
     value = CharField()
 
-class Mod(BaseModel):
-    name = CharField()
-    value = CharField()
+class Param(KeyValueModel):
+    pass
 
-class Prop(BaseModel):
-    name = CharField()
-    value = CharField()
+class Mod(KeyValueModel):
+    pass
+
+class Prop(KeyValueModel):
+    pass
+
 
 class Part(BaseModel):
     block = CharField()
@@ -69,5 +72,6 @@ class Part(BaseModel):
 
         return params
 
+db.connect()
 db.create_tables([Stock, Param, Mod, Prop, Part, Pin, Part.params.get_through_model(), Part.stock.get_through_model(), Part.mods.get_through_model(), Part.props.get_through_model(), Part.pins.get_through_model()])
 

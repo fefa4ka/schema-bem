@@ -1,22 +1,39 @@
-import sys
-import os
+import builtins
 import glob
 import importlib
-from pathlib import Path
+import os
+import sys
 from collections import defaultdict
+from pathlib import Path
+from typing import Optional
 
+from skidl import KICAD, Net, set_backup_lib, set_default_tool
+
+from skidl import pyspice
 from .base import Block
-from .utils.args import u, is_tolerated
-from .utils import merge
 from .builder import Build
 from .stockman import Stockman
-from skidl import Net, set_default_tool, set_backup_lib, KICAD
-import builtins
+from .utils import merge
+from .utils.args import is_tolerated, u
 
 set_backup_lib('.')
 set_default_tool(KICAD)
 
 builtins.SIMULATION = False
+builtins.DEBUG = True
+builtins.TEMPLATE = 'TEMPLATE'
+
+
+def get_created_blocks(block_type: Optional[str]):
+    blocks = {}
+
+    for pair in Block.scope:
+        if issubclass(pair[1].__class__, block_type or Block):
+            block = pair[1]
+            blocks[block.ref] = block
+
+    return blocks
+
 
 def bem_scope(root='./blocks'):
     blocks = defaultdict(dict)
@@ -88,9 +105,11 @@ bem_scope_dict = merge(
 bem_scope_module(bem_scope_dict)
 
 
+from PySpice.Unit import _build_unit_shortcut, u_Degree
 # Digital Units
 from PySpice.Unit.Unit import Unit
-from PySpice.Unit import u_Degree, _build_unit_shortcut
+
+
 class Byte(Unit):
     __unit_name__ = 'byte'
     __unit_suffix__ = 'B'

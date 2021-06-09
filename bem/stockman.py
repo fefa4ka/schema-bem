@@ -1,6 +1,6 @@
 from .model import Part
 from .model import Param, Mod, Prop
-from .utils.args import u, is_tolerated
+from .utils.args import u, is_tolerated, get_arguments, get_params
 
 class Stockman:
     def __init__(self, block):
@@ -11,6 +11,10 @@ class Stockman:
         block = self.block
         load = {}
 
+        params = get_params(block)
+        args = get_arguments(block)
+        keys = { **params, **args }
+
         self.upper_limit = ['V', 'P', 'I', 'Z', 'I_load', 'R_load', 'P_load']
         upper_limit_prop = block.props.get('upper_limit', [])
         if upper_limit_prop:
@@ -19,10 +23,6 @@ class Stockman:
             else:
                 self.upper_limit.append(upper_limit_prop)
 
-
-        params = block.get_params()
-        args = block.get_arguments()
-        keys = { **params, **args }
         for param in keys:
             if param in ['units', 'unit', 'model', 'Load']:
                 continue
@@ -72,7 +72,7 @@ class Stockman:
             return False
 
         for index, param in enumerate(params):
-            if param == 'value':
+            if param in ['value',  'upper_limit']:
                 continue
 
             param_values = values[index]
