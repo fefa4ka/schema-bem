@@ -167,7 +167,7 @@ def inspect_ref(block):
     """
     Ref extracted from code variable name
     """
-    ref: str = getattr(block, 'ref', '')
+    origin_ref = ref = getattr(block, 'ref', '')
     name: str = ref or getattr(block, 'name', '')
     name = name.split('.')[-1]
 
@@ -193,12 +193,53 @@ def inspect_ref(block):
     if assign_pos == -1 or code.find('return') != -1 or (and_pos != -1 and assign_pos > and_pos) or (or_pos != -1 and assign_pos > or_pos) or value == code:
         ref = name
 
-    if caller and hasattr(caller, 'name'):
+    if caller and hasattr(caller, 'name') and not hasattr(caller, 'root'):
         block_name = caller.ref.split('.')[-1]
         #if block_name not in ref:
-        ref = block_name + '_' + ref
+        short_name = ''.join(re.findall('[A-Z]+', block_name))
+        ref = short_name + '_' + ref
 
-    return ref
+    def short_tokens(origin_ref, length=4):
+        tokens = re.findall('[A-Z0-9][^A-Z0-9]*', origin_ref)
+        short_name = ''.join([token[0:length] for token in tokens])
+        return short_name
+
+    refs = [short_tokens(ref)]
+    if origin_ref:
+        short_name = short_tokens(origin_ref)
+        refs.append(short_name)
+
+    total_ref = '_'.join(refs)
+
+    if len(ref) > 7:
+        total_ref = total_ref.replace('_', '')
+
+    if len(total_ref) > 7:
+        total_ref = short_tokens(total_ref)
+
+    if len(ref) > 7:
+        total_ref = ''.join(re.findall('[A-Z0-9]+', total_ref))
+
+    return total_ref
+
+    # FIXME: Make a better
+
+    if len(ref) > 7:
+        total_ref = total_ref.replace('_', '')
+
+    if len(total_ref) > 7:
+        total_ref = short_tokens(total_ref)
+
+    if len(total_ref) > 7:
+        total_ref = short_tokens(total_ref, 3)
+
+    if len(total_ref) > 7:
+        total_ref = short_tokens(total_ref, 2)
+
+    if len(total_ref) > 7:
+        total_ref = ''.join(re.findall('[A-Z0-9]+', total_ref))
+
+    return total_ref
 
 
 def block_ref(block):

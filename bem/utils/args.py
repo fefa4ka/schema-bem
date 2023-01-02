@@ -325,7 +325,7 @@ def parse_arguments(arguments, request, defaults):
             continue
 
         if isinstance(value, dict):
-            value = value.get('value', None)
+            value = value.get('value', value)
 
         #if isinstance(props[attr], bool):
         #    props[attr] = value

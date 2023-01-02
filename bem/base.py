@@ -37,6 +37,9 @@ class Block:
     def __init__(self, *args, **kwargs):
         # Build scope
         # Previous block, if they didn't release, owner of current
+        if not len(self.scope):
+            self.root = True
+
         self.scope.append((self.owner[-1], self))
         self.owner.append(self)
 
@@ -143,11 +146,12 @@ class Block:
         for cls in classes:
             if hasattr(cls, 'willMount'):
                 mount_args_keys = getargspec(cls.willMount).args
+                # TODO: Why we are copy arguments
                 mount_kwargs = kwargs.copy()
                 if len(mount_args_keys) == 1:
                     args = []
 
-                mount_args = {key: value for key, value in mount_kwargs.items()
+                mount_args = {key: value.copy() if hasattr(value, 'copy') else value for key, value in mount_kwargs.items()
                               if key in mount_args_keys}
                 cls.willMount(self, *args, **mount_args)
 

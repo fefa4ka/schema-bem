@@ -90,6 +90,8 @@ class Base:
             # FIXME: Test brokens but if disabled schematics with raw value
             if hasattr(value, "canonise"):
                 value = value.canonise()
+                # FIXME: 4.7 kOhm not properly round for example
+#                value._value = round(value.value)
         else:
             value = self.value
 

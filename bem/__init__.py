@@ -111,10 +111,10 @@ from PySpice.Unit.Unit import Unit
 
 
 class Byte(Unit):
-    __unit_name__ = 'byte'
-    __unit_suffix__ = 'B'
-    __quantity__ = 'byte'
-    __default_unit__ = False
+    UNIT_NAME = 'byte'
+    UNIT_SUFFIX = 'B'
+    QUANTITY = 'byte'
+    DEFAULT_UNIT = False
 
 _build_unit_shortcut(Byte())
 

@@ -71,10 +71,8 @@ class Base(Block):
                 pins.append(self.__getitem__(pin, **criteria))
 
             return pins
-        else:
-            return pins
 
-        return None
+        return pins
 
     def create_network(self):
         # detect by caller method name kind of connetion __and__ or __or__

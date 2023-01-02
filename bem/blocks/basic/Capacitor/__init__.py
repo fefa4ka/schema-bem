@@ -19,10 +19,11 @@ class Base(Combination()):
         When you charge up a capacitor, you’re supplying energy. The capacitor doesn’t get hot; instead, it stores the energy in its internal electric fields.
 
         ## Applications
-        * Filters
+        * [Filters](/block/analog.Filter)
+        * [Time constant](/block/analog.voltage.Decay)
         * Resonators
-        * Power Supply
-        * Voltage Multiplier
+        * [Power supply](/block/analog.power.Supply)
+        * [Voltage multiplier](/block/analog.voltage.Multiplier)
 
         ## Features
         So a capacitor is more complicated than a resistor: the current is not simply proportional to the voltage, but rather to the rate of change of voltage. If you change the voltage across a farad by 1 volt per second, you are supplying an amp. Conversely, if you supply an amp, its voltage changes by 1 volt per second.
@@ -40,6 +41,7 @@ class Base(Combination()):
         - Paul Horowitz and Winfield Hill. "1.4.1 Capacitors" The Art of Electronics – 3rd Edition. Cambridge University Press, 2015, pp. 51-52
     """
     __increase = False
+    upper_limit = True
 
     def willMount(self, value = 1 @ u_F):
         """

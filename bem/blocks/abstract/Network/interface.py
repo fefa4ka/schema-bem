@@ -1,5 +1,6 @@
 from . import Base
 from types import MethodType
+from hashlib import md5
 
 class Interfaced:
     interfaces = []
@@ -31,13 +32,16 @@ class Interfaced:
         raise Exception
 
     def __or__(self, instance):
+        self.log("FIXME: Implement parallel interface connection")
         raise Exception
 
     def __interface__(self, instance):
         def power_crc(instance):
-            return len(instance.v_ref.get_pins()) + len(instance.gnd.get_pins()) + len(instance.v_ref.get_nets()) + len(instance.gnd.get_nets()) 
+            crc = str(instance.v_ref.get_pins()) + str(instance.gnd.get_pins()) + str(instance.v_ref.get_nets()) + str(instance.gnd.get_nets())
+            return md5(crc.encode()).hexdigest()
 
         # If power net will not changed, we connect power bus in generic way
+        # FIXME: if new connection with single pin net
         instance_power_crc = power_crc(instance)
 
         instance_interfaces = instance.mods.get('interface', None) or instance.props.get('interface', None) or []
@@ -47,7 +51,7 @@ class Interfaced:
                 interface = getattr(self, protocol)
                 interface(instance)
 
-        if power_crc(instance) == instance_power_crc:
+        if power_crc(self) == power_crc(instance):
             self.connect_power_bus(instance)
 
     def get_interface_pins(self, protocol):

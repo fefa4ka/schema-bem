@@ -49,6 +49,7 @@ class Simulate:
 
         self.circuit = circuit.generate_netlist(libs=libs)
 
+        print(self.circuit)
         # Grab ERC from logger
         erc = ERC_logger()
         builtins.default_circuit.ERC()
@@ -138,15 +139,16 @@ class Simulate:
 
         return measures
 
-    def volt_ampere(self, voltage_sweep, temperature=default_temperature):
+    def volt_ampere(self, voltage_sweep, temperature=default_temperature, axis_x='V_input', axis_y='I_vvvs'):
         simulations = Simulate(self.block).dc({ 'VVVS': voltage_sweep }, temperature=temperature)
         chart = defaultdict(dict)
         for temp, simulation in simulations.items():
             label = '@ %s °C' % str(temp)
             for run in simulation:
                 index = run['sweep']
-                chart[index]['V_input'] = run['V_input']
-                chart[index][label + ' I_vvvs'] = run['I_vvvs']
+
+                chart[index][axis_x] = run[axis_x]
+                chart[index][label + ' ' + axis_y] = run[axis_y]
 
         sweep = list(chart.keys())
 
@@ -154,15 +156,15 @@ class Simulate:
 
         return [chart[index] for index in sweep]
 
-    def volt_volt(self, voltage_sweep, temperature=default_temperature):
+    def volt_volt(self, voltage_sweep, temperature=default_temperature, axis_x='V_input', axis_y='V_output'):
         simulations = Simulate(self.block).dc({ 'VVVS': voltage_sweep }, temperature=temperature)
         chart = defaultdict(dict)
         for temp, simulation in simulations.items():
             label = '@ %s °C' % str(temp)
             for run in simulation:
                 index = run['sweep']
-                chart[index]['V_input'] = run['V_input']
-                chart[index]['V_input'] = run['V_output']
+                chart[index][axis_x] = run[axis_x]
+                chart[index][axis_y] = run[axis_y]
 
         sweep = list(chart.keys())
 

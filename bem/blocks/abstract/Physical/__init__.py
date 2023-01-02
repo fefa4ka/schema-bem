@@ -63,8 +63,8 @@ class Base:
                             return params[0]
 
         # HACK: Assume that enumeration not need math substring
-        if not criteria.get('match_substring', False) and len(attrs_or_pins) == 1 and (isinstance(attrs_or_pins[0], str) and  attrs_or_pins[0].find(',') == -1):
-            criteria['match_substring'] = True
+        if not criteria.get('match_regex', False) and len(attrs_or_pins) == 1 and (isinstance(attrs_or_pins[0], str) and  attrs_or_pins[0].find(',') == -1):
+            criteria['match_regex'] = True
 
         return super().__getitem__(*attrs_or_pins, **criteria)
 
@@ -75,7 +75,12 @@ class Base:
         """
 
         # Possible to pass custom part from Block props
+        # FIXME: props pass element as list, research where is needed
         part = self.props.get('part', None)
+
+        if isinstance(part, list) and len(part) == 1:
+            part = part[0]
+
         self.unit = 'A'
 
         if part:
@@ -91,7 +96,8 @@ class Base:
 
         if not hasattr(self, 'selected_part') and not self.props.get('virtual_part', False):
             selected_part = select_part(self)
-            apply_part(self, selected_part)
+            if selected_part:
+                apply_part(self, selected_part)
 
         # Restart profiler
         sys.setprofile(tracer)
@@ -105,6 +111,7 @@ class Base:
 
         circuit = builtins.default_circuit
         circuits_units = []
+        # FIXME: Not connected unit pins broke SPICE simulation
         # TODO: Check is it work
         if hasattr(circuit, 'units') and self.name in circuit.units:
             circuits_units = circuit.units[self.name]
@@ -204,7 +211,13 @@ class Base:
 
     @property
     def footprint(self):
-        return self.props.get('footprint', None)
+        footprint = self.props.get('footprint', None)
+
+        # FIXME: props pass element as list, research where is needed
+        if isinstance(footprint, list) and len(footprint) == 1:
+            footprint = footprint[0]
+
+        return footprint
 
 
 def set_pins_aliases(template, pins):
@@ -227,7 +240,7 @@ def raise_part_unavailable(block):
     description = ', '.join([ arg + ' = ' + str(values[arg].get('value', '')) + values[arg]['unit'].get('suffix', '') for arg in values.keys()])
 
     block.log("%s: %s" % (block.name, description))
-    raise LookupError("No suitable part in stock")
+#    raise LookupError("No suitable part in stock")
 
 
 def select_part(block):

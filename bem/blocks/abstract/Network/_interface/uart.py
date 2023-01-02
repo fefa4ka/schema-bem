@@ -9,3 +9,5 @@ class Modificator(Interfaced):
 
         rx += instance['TX']
         tx += instance['RX']
+
+        self.gnd & instance.gnd

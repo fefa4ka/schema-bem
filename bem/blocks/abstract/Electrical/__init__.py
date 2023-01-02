@@ -6,6 +6,7 @@ from PySpice.Unit import u_V, u_Ohm, u_A, u_W, u_S, u_s
 from lcapy import R
 from skidl.net import Net as NetType
 import sys
+import re
 import inspect
 import builtins
 
@@ -106,7 +107,7 @@ class Base:
     def finish(self):
         super().finish()
 
-        ref_inner_blocks(self)
+        ref_inner_blocks(self, split=not hasattr(self, 'root'))
 
     # Circuit Creation
     def circuit(self, *args, **kwargs):
@@ -204,10 +205,14 @@ class Base:
         return None
 
 
-def ref_inner_blocks(block):
+def ref_inner_blocks(block, split=True):
     name = block.ref
     name = name.split('.')[-1]
     values = []
+    def short_tokens(origin_ref, length=4):
+        tokens = re.findall('[A-Z0-9][^A-Z0-9]*', origin_ref)
+        short_name = ''.join([token[0:length] for token in tokens])
+        return short_name
 
     for frame in block.build_frames:
         for key, value in frame.f_locals.items():
@@ -239,7 +244,31 @@ def ref_inner_blocks(block):
 
                 key = ''.join([word.capitalize() for word
                                in key.replace('_', '.').split('.')])
-                ref = name + '_' + key
+
+                ref = key
+                if split:
+                    ref = name + '_' + key
+
+                if len(ref) > 6:
+                    name = name.replace('_', '')
+                    ref = name + '_' + key
+
+                if len(ref) > 6:
+                    name = short_tokens(name, 3)
+                    ref = name + key
+
+                if len(ref) > 6:
+                    ref = name + short_tokens(key, 3)
+
+                if len(ref) > 6:
+                    name = short_tokens(name, 2)
+                    ref = name + short_tokens(key, 3)
+
+                if len(ref) > 6:
+                    ref = short_tokens(name, 2) + short_tokens(key, 2)
+
+                if len(ref) > 6:
+                    ref = ''.join(re.findall('[A-Z0-9]+', ref))
 
                 if is_block_has_part:
                     values.append(value)
